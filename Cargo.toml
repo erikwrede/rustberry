@@ -1,0 +1,18 @@
+[package]
+name = "rustberry"
+version = "0.6.0"
+edition = "2021"
+
+[lib]
+name = "_rustberry"
+crate-type = ["cdylib"]
+
+[package.metadata.maturin]
+name = "rustberry._rustberry"
+
+[dependencies]
+apollo-compiler = { git = "https://github.com/apollographql/apollo-rs", version = "0.4.1" }
+
+[dependencies.pyo3]
+version = "0.13"
+features = ["extension-module"]
