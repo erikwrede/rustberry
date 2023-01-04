@@ -14,16 +14,26 @@ pub struct Node {
 
 }
 
+impl Node{}
+
 #[pyclass(extends=Node,subclass)]
 pub struct NameNode {
     #[pyo3(get)]
     value: String,
 }
 
+impl NameNode {
+    pub fn clone(&self) -> Self {
+        Self {
+            value: self.value.clone(),
+        }
+    }
+}
+
 #[pyclass(extends=Node,subclass)]
 pub struct DocumentNode {
     #[pyo3(get)]
-    definitions: Arc<Vec<Arc<DefinitionNode>>>,
+    definitions: Vec<DefinitionNode>,
 }
 
 #[pyclass(extends=Node,subclass)]
@@ -34,13 +44,13 @@ pub struct DefinitionNode {
 #[pyclass(extends=DefinitionNode,subclass)]
 pub struct ExecutableDefinitionNode {
     #[pyo3(get)]
-    name: Option<Arc<NameNode>>,
+    name: Option<NameNode>,
     #[pyo3(get)]
-    directives: Arc<Vec<Arc<ConstDirectiveNode>>>,
+    directives: Vec<DirectiveNode>,
     #[pyo3(get)]
-    variable_definitions: Arc<Vec<Arc<VariableDefinitionNode>>>,
+    variable_definitions: Vec<VariableDefinitionNode>,
     #[pyo3(get)]
-    selection_set: Arc<SelectionSetNode>,
+    selection_set: SelectionSetNode,
 }
 #[pyclass(extends=ExecutableDefinitionNode,subclass)]
 pub struct OperationDefinitionNode {
@@ -51,51 +61,54 @@ pub struct OperationDefinitionNode {
 #[pyclass(extends=Node,subclass)]
 pub struct VariableDefinitionNode {
     #[pyo3(get)]
-    variable: Arc<VariableNode>,
+    variable: VariableNode,
     #[pyo3(get)]
-    type_: Arc<TypeNode>,
+    type_: TypeNode,
     #[pyo3(get)]
-    default_value: Option<Arc<ValueNode>>,
+    default_value: Option<ValueNode>,
     #[pyo3(get)]
-    directives: Arc<Vec<Arc<ConstDirectiveNode>>>,
+    directives: Vec<DirectiveNode>,
 }
 
 #[pyclass(extends=Node,subclass)]
 pub struct SelectionSetNode {
     #[pyo3(get)]
-    selections: Arc<Vec<Arc<SelectionNode>>>,
+    selections: Vec<SelectionNode>,
 }
 
 #[pyclass(extends=Node,subclass)]
 pub struct SelectionNode {
     #[pyo3(get)]
-    directives: Arc<Vec<Arc<DirectiveNode>>>,
+    directives: Vec<DirectiveNode>,
 }
 
 #[pyclass(extends=SelectionNode,subclass)]
 pub struct FieldNode {
     #[pyo3(get)]
-    alias: Option<Arc<NameNode>>,
+    alias: Option<NameNode>,
     #[pyo3(get)]
-    name: Arc<NameNode>,
+    name: NameNode,
     #[pyo3(get)]
-    arguments: Arc<Vec<Arc<ArgumentNode>>>,
+    arguments: Vec<ArgumentNode>,
     #[pyo3(get)]
-    selection_set: Option<Arc<SelectionSetNode>>,
+    selection_set: Option<SelectionSetNode>,
 }
 
 #[pyclass(extends=Node,subclass)]
 pub struct ArgumentNode {
     #[pyo3(get)]
-    name: Arc<NameNode>,
+    name: NameNode,
     #[pyo3(get)]
-    value: Arc<ValueNode>,
+    value: ValueNode,
 }
 
-#[subclasses(extends=ArgumentNode,subclass)]
-pub struct ConstArgumentNode {
-    #[pyo3(get)]
-    value: Arc<ConstValueNode>,
+impl ArgumentNode {
+    pub fn clone(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            value: self.value.clone(),
+        }
+    }
 }
 
 // Fragments
@@ -103,15 +116,15 @@ pub struct ConstArgumentNode {
 #[pyclass(extends=SelectionNode,subclass)]
 pub struct FragmentSpreadNode {
     #[pyo3(get)]
-    name: Arc<NameNode>,
+    name: NameNode,
 }
 
 #[pyclass(extends=SelectionNode,subclass)]
 pub struct InlineFragmentNode {
     #[pyo3(get)]
-    type_condition: Arc<NamedTypeNode>,
+    type_condition: NamedTypeNode,
     #[pyo3(get)]
-    selection_set: Arc<SelectionSetNode>,
+    selection_set: SelectionSetNode,
 }
 
 #[pyclass(extends=ExecutableDefinitionNode,subclass)]
@@ -119,7 +132,7 @@ pub struct FragmentDefinitionNode {
     #[pyo3(get)]
     name: NameNode,
     #[pyo3(get)]
-    type_condition: Arc<NamedTypeNode>,
+    type_condition: NamedTypeNode,
 }
 
 // Values
@@ -131,7 +144,7 @@ pub struct ValueNode {
 #[pyclass(extends=ValueNode,subclass)]
 pub struct VariableNode {
     #[pyo3(get)]
-    name: Arc<NameNode>,
+    name: NameNode,
 }
 
 #[pyclass(extends=ValueNode,subclass)]
@@ -167,51 +180,30 @@ pub struct EnumValueNode {
 #[pyclass(extends=ValueNode,subclass)]
 pub struct ListValueNode {
     #[pyo3(get)]
-    values: Arc<Vec<Arc<ValueNode>>>,
+    values: Vec<ValueNode>,
 }
 
-#[pyclass(extends=ListValueNode,subclass)]
-pub struct ConstListValueNode {
-    #[pyo3(get)]
-    values: Arc<Vec<Arc<ConstValueNode>>>,
-}
 
 #[pyclass(extends=ValueNode,subclass)]
 pub struct ObjectValueNode {
     #[pyo3(get)]
-    fields: Arc<Vec<Arc<ObjectFieldNode>>>,
+    fields: Vec<ObjectFieldNode>,
 }
 
-#[pyclass(extends=ObjectValueNode,subclass)]
-pub struct ConstObjectValueNode {
-    #[pyo3(get)]
-    fields: Arc<Vec<Arc<ConstObjectFieldNode>>>,
-}
 
 #[pyclass(extends=Node,subclass)]
 pub struct ObjectFieldNode {
     #[pyo3(get)]
-    name: Arc<NameNode>,
+    name: NameNode,
     #[pyo3(get)]
-    value: Arc<ValueNode>,
+    value: ValueNode,
 }
 
-#[pyclass(extends=ObjectFieldNode,subclass)]
-pub struct ConstObjectFieldNode {
-    #[pyo3(get)]
-    value: Arc<ConstValueNode>,
-}
 
 #[pyclass(extends=Node,subclass)]
 pub struct DirectiveNode {
     #[pyo3(get)]
-    name: Arc<NameNode>,
+    name: NameNode,
     #[pyo3(get)]
-    arguments: Arc<Vec<Arc<ArgumentNode>>>,
-}
-
-#[pyclass(extends=DirectiveNode,subclass)]
-pub struct ConstDirectiveNode {
-    #[pyo3(get)]
-    arguments: Arc<Vec<Arc<ConstArgumentNode>>>,
+    arguments: Vec<ArgumentNode>,
 }
