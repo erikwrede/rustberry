@@ -19,18 +19,20 @@ print("Schema validation result", compiler.validate())
 
 def validate_timing():
     file_id = compiler.add_executable(operation)
-    print(file_id)
-    validation_errors = compiler.validate_file(file_id) # fixme this still validates the entire schema as wekk
-    print("Validation errors:", not validation_errors)
+    #print(file_id)
+    validation_errors = compiler.validate_file(file_id)
+    # ast = compiler.gql_core_ast(file_id)
+    #print(ast.to_dict())
+    #print("Validation errors:", not validation_errors)
 
 
 
 profiler = Profiler(interval=0.0001)
 profiler.start()
-num = 1
+num = 10
 time = timeit.timeit(validate_timing, number=num)
 print(f"Parsing & Validation on apollo-rs took an average of {time * 1000 / num} milliseconds ({num} iterations)")
 
 profiler.stop()
-with open("output.html", "w") as f:
-    f.write(profiler.output_html())
+#with open("output.html", "w") as f:
+#    f.write(profiler.output_html())

@@ -2,12 +2,15 @@
 extern crate apollo_compiler;
 
 use apollo_compiler::{ApolloCompiler, ApolloDiagnostic, FileId as ApolloFileId};
-use apollo_compiler::diagnostics::{SyntaxError};
+use apollo_compiler::diagnostics::SyntaxError;
 // this is private :( use apollo_compiler::validation::validation_db::{validate_executable};
 use pyo3::prelude::*;
 
+use crate::apollo_compiler::database::{AstDatabase, HirDatabase, InputDatabase};
 use crate::apollo_compiler::validation::ValidationDatabase;
-use crate::apollo_compiler::database::{AstDatabase, InputDatabase, HirDatabase};
+use crate::ast::gql_core::converter::CoreConversionContext;
+
+mod ast;
 
 //use pyo3::types::{PyString,PyUnicode};
 
@@ -28,6 +31,7 @@ impl ValidationResult {
 #[pyclass]
 struct QueryCompiler {
     compiler: ApolloCompiler,
+    conversion_context: CoreConversionContext,
 }
 
 #[pyclass]
@@ -49,8 +53,12 @@ impl QueryCompiler {
     #[new]
     fn new() -> Self {
         // create and return a new instance of MyRustObject
+        let conversion_context = Python::with_gil(|py| {
+            CoreConversionContext::new(py)
+        });
         Self {
             compiler: ApolloCompiler::new(),
+            conversion_context,
         }
     }
 
@@ -58,7 +66,6 @@ impl QueryCompiler {
         self.compiler.add_type_system(schema, "schema.graphql");
         Ok(())
     }
-
 
 
     fn add_executable(&mut self, contents: &str) -> PyResult<FileId> {
@@ -78,23 +85,23 @@ impl QueryCompiler {
         //self.compiler.db.storage.
         //self.compiler.db.
         //let diagnostics = validate_executable(self.compiler.db,file_id);
-
+        let apollo_file_id = file_id.file_id;
         //let diagnostics = self.compiler.db.validate_operation_definitions(file_id);
         // extracted from ast.rs/check_syntax - we ONLY want to check the syntax for a single ast, not traverse the entire AST
         // - there is no cached method on the db available yet
-        let mut diagnostics = self.compiler.db.ast(file_id.file_id)
+        let mut diagnostics = self.compiler.db.ast(apollo_file_id)
             .errors()
             .into_iter()
             .map(|err| {
                 ApolloDiagnostic::SyntaxError(SyntaxError {
-                    src: self.compiler.db.source_code(file_id.file_id),
+                    src: self.compiler.db.source_code(apollo_file_id),
                     span: (err.index(), err.data().len()).into(), // (offset, length of error token)
                     message: err.message().into(),
                 })
             }).collect::<Vec<ApolloDiagnostic>>();
 
-        diagnostics.extend(self.compiler.db.validate_operation_definitions(file_id.file_id));
-        diagnostics.extend(self.compiler.db.validate_unused_variable(file_id.file_id));
+        //diagnostics.extend(self.compiler.db.validate_operation_definitions(apollo_file_id));
+        //diagnostics.extend(self.compiler.db.validate_unused_variable(apollo_file_id));
 
         let errors_count = diagnostics.iter().filter(|d| d.is_error()).count();
 
@@ -109,6 +116,13 @@ impl QueryCompiler {
         let errors_count = diagnostics.iter().filter(|d| d.is_error()).count();
 
         Ok(errors_count == 0)
+    }
+
+    fn gql_core_ast(&mut self, py: Python<'_>, file_id: FileId) -> PyResult<PyObject> {
+        // let ast = self.compiler.db.ast(file_id.file_id);
+            let gql_core_ast =
+                self.conversion_context.convert_core_to_core_ast(py, &self.compiler, file_id.file_id);
+            Ok(gql_core_ast?)
     }
 }
 
