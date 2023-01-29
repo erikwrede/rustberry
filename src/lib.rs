@@ -1,7 +1,7 @@
 //use pyo3::wrap_pyfunction;
 extern crate apollo_compiler;
 
-use apollo_compiler::{ApolloCompiler, ApolloDiagnostic, FileId};
+use apollo_compiler::{ApolloCompiler, ApolloDiagnostic, FileId as ApolloFileId};
 use apollo_compiler::diagnostics::{SyntaxError};
 // this is private :( use apollo_compiler::validation::validation_db::{validate_executable};
 use pyo3::prelude::*;
@@ -30,6 +30,20 @@ struct QueryCompiler {
     compiler: ApolloCompiler,
 }
 
+#[pyclass]
+#[derive(Clone)]
+struct FileId {
+    file_id: ApolloFileId,
+}
+
+impl FileId {
+    fn from_file_id(file_id: ApolloFileId) -> Self {
+        Self {
+            file_id,
+        }
+    }
+}
+
 #[pymethods]
 impl QueryCompiler {
     #[new]
@@ -41,14 +55,17 @@ impl QueryCompiler {
     }
 
     fn set_schema(&mut self, schema: &str) -> PyResult<()> {
-        self.compiler.create_schema(schema, "schema.graphql");
+        self.compiler.add_type_system(schema, "schema.graphql");
         Ok(())
     }
 
-    fn add_executable(&mut self, contents: &str) -> PyResult<u32> {
+
+
+    fn add_executable(&mut self, contents: &str) -> PyResult<FileId> {
         // the path is optional and just used in diagnostics, it doesn't need to be unique
-        let file_id = self.compiler.create_executable(contents, "");
-        Ok(file_id.0)
+        let file_id = self.compiler.add_document(contents, "");
+        // return the file id as a u64
+        Ok(FileId::from_file_id(file_id))
     }
 
     fn add_validate(&mut self, contents: &str) -> PyResult<bool> {
@@ -57,28 +74,27 @@ impl QueryCompiler {
         Ok(validation_result.unwrap())
     }
 
-    fn validate_file(&mut self, file_id: u32) -> PyResult<bool> {
+    fn validate_file(&mut self, file_id: FileId) -> PyResult<bool> {
         //self.compiler.db.storage.
         //self.compiler.db.
         //let diagnostics = validate_executable(self.compiler.db,file_id);
-        let file_id = FileId(file_id);
 
         //let diagnostics = self.compiler.db.validate_operation_definitions(file_id);
         // extracted from ast.rs/check_syntax - we ONLY want to check the syntax for a single ast, not traverse the entire AST
         // - there is no cached method on the db available yet
-        let mut diagnostics = self.compiler.db.ast(file_id)
+        let mut diagnostics = self.compiler.db.ast(file_id.file_id)
             .errors()
             .into_iter()
             .map(|err| {
                 ApolloDiagnostic::SyntaxError(SyntaxError {
-                    src: self.compiler.db.source_code(file_id),
+                    src: self.compiler.db.source_code(file_id.file_id),
                     span: (err.index(), err.data().len()).into(), // (offset, length of error token)
                     message: err.message().into(),
                 })
             }).collect::<Vec<ApolloDiagnostic>>();
 
-        diagnostics.extend(self.compiler.db.validate_operation_definitions(file_id));
-        diagnostics.extend(self.compiler.db.validate_unused_variable(file_id));
+        diagnostics.extend(self.compiler.db.validate_operation_definitions(file_id.file_id));
+        diagnostics.extend(self.compiler.db.validate_unused_variable(file_id.file_id));
 
         let errors_count = diagnostics.iter().filter(|d| d.is_error()).count();
 
