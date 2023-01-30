@@ -63,7 +63,7 @@ impl QueryCompiler {
 
     fn add_executable(&mut self, contents: &str) -> PyResult<FileId> {
         // the path is optional and just used in diagnostics, it doesn't need to be unique
-        let file_id = self.compiler.add_document(contents, "");
+        let file_id = self.compiler.add_executable(contents, "");
         // return the file id as a u64
         Ok(FileId::from_file_id(file_id))
     }
