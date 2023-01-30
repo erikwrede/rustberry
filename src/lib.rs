@@ -100,8 +100,8 @@ impl QueryCompiler {
                 })
             }).collect::<Vec<ApolloDiagnostic>>();
 
-        //diagnostics.extend(self.compiler.db.validate_operation_definitions(apollo_file_id));
-        //diagnostics.extend(self.compiler.db.validate_unused_variable(apollo_file_id));
+        diagnostics.extend(self.compiler.db.validate_operation_definitions(apollo_file_id));
+        diagnostics.extend(self.compiler.db.validate_unused_variable(apollo_file_id));
 
         let errors_count = diagnostics.iter().filter(|d| d.is_error()).count();
 

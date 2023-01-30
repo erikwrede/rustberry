@@ -71,26 +71,26 @@ impl CoreConversionContext {
     }
 
     fn convert_field_to_core_field(&self, py: Python, field: &apollo_compiler::hir::Field) -> PyResult<PyObject> {
-        println!("Converting field to core field...");
+        //println!("Converting field to core field...");
         let field_node_kwargs = PyDict::new(py);
         if field.selection_set().selection().len() > 0 {
-            println!("Field has selection set");
+            //println!("Field has selection set");
             let selection_set = self.convert_selection_set_to_core_selection_set(py, field.selection_set())?;
             field_node_kwargs.set_item("selection_set", selection_set)?;
-            println!("Selection set converted!");
+            //println!("Selection set converted!");
         }
 
-            println!("Alias");
+            //println!("Alias");
         if let Some(alias) = field.alias() {
             field_node_kwargs.set_item("alias", PyString::new(py, alias.0.as_str()))?;
         }
 
-        println!("Name");
+        //println!("Name");
         let name = field.name().to_string();
         let name = PyString::new(py, &name);
         field_node_kwargs.set_item("name", name)?;
 
-        println!("Initing lists");
+        //println!("Initing lists");
 
         // init an empty list of pyobjects
         let arguments = PyList::empty(py).to_object(py);
@@ -101,13 +101,13 @@ impl CoreConversionContext {
 
         field_node_kwargs.set_item("directives", directives)?;
 
-        println!("Calling field constructor");
+        //println!("Calling field constructor");
 
         self.field_node.call(py, (), Some(field_node_kwargs))
     }
 
     fn convert_selection_set_to_core_selection_set(&self, py: Python, selection_set: &apollo_compiler::hir::SelectionSet) -> PyResult<PyObject> {
-        println!("Converting selection set...");
+        //println!("Converting selection set...");
         let selection_set_kwargs = PyDict::new(py);
         // FIXME do we NEED to use PyTuple here?
         let selections = PyList::empty(py);
@@ -119,13 +119,13 @@ impl CoreConversionContext {
                 apollo_compiler::hir::Selection::InlineFragment(inline_fragment) => None,// self.convert_inline_fragment_to_core_inline_fragment(py, inline_fragment),
             };
             if let Some(core_selection) = core_selection {
-                println!("Appending new Selection to the set...");
+                //println!("Appending new Selection to the set...");
                 selections.append(core_selection?)?;
             }
         }
-        println!("Done converting selections!");
+        //println!("Done converting selections!");
         selection_set_kwargs.set_item("selections", selections)?;
-        println!("Appended selections to kwargs!");
+        //println!("Appended selections to kwargs!");
         self.selection_set_node.call(py, (), Some(selection_set_kwargs))
     }
 
@@ -142,15 +142,15 @@ impl CoreConversionContext {
                 let operation_name = operation_name.to_string();
                 // FIXME is this necessary?
                 let operation_name = PyString::new(py, &operation_name);
-                println!("Trying to set name!");
+                //println!("Trying to set name!");
                 operation_kwargs.set_item("name", operation_name)?;
-                println!("Name set!");
+                //println!("Name set!");
             }
 
 
             let operation_type = self.operation_type.get_operation_type(operation.operation_ty());
 
-            println!("Operation type resolved!");
+            //println!("Operation type resolved!");
             /*
             directives: PyTuple["DirectiveNode", ...]
             variable_definitions: Tuple["VariableDefinitionNode", ...]
@@ -160,23 +160,23 @@ impl CoreConversionContext {
             let variable_definitions = operation.variables();
             let selection_set = operation.selection_set();
 
-            println!("Selection sett, directives, variables done!");
+            //println!("Selection sett, directives, variables done!");
 
             operation_kwargs.set_item("operation", operation_type.into_ref(py))?;
 
-            println!("Operation type set kwarg!");
+            //println!("Operation type set kwarg!");
             operation_kwargs.set_item("selection_set", self.convert_selection_set_to_core_selection_set(py, selection_set)?)?;
-            println!("Selection Set converted!");
+            //println!("Selection Set converted!");
 
-            println!("Creating Operation def node...");
+            //println!("Creating Operation def node...");
             core_operations.append(self.operation_definition.call(py, (), Some(operation_kwargs))?)?;
 
-            println!("Created Operation def node!");
+            //println!("Created Operation def node!");
         }
         let document_node_kwargs = PyDict::new(py);
         document_node_kwargs.set_item("definitions", core_operations)?;
 
-        println!("Creating document node!");
+        //println!("Creating document node!");
         self.document_node.call(py, (), Some(document_node_kwargs))
     }
 }
