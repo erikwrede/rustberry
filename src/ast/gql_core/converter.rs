@@ -50,6 +50,7 @@ pub struct CoreConversionContext {
     selection_set_node: Py<PyAny>,
     field_node: Py<PyAny>,
     document_node: Py<PyAny>,
+    name_node: Py<PyAny>,
 }
 
 impl CoreConversionContext {
@@ -60,6 +61,7 @@ impl CoreConversionContext {
         let PyOperationDefinitionNode = graphql_core_ast.getattr("OperationDefinitionNode").unwrap();
         let PySelectionSetNode = graphql_core_ast.getattr("SelectionSetNode").unwrap();
         let PyFieldNode = graphql_core_ast.getattr("FieldNode").unwrap();
+        let PyNameNode = graphql_core_ast.getattr("NameNode").unwrap();
 
         Self {
             operation_type: CoreOperationType::new(PyOperationType),
@@ -67,7 +69,18 @@ impl CoreConversionContext {
             selection_set_node: PySelectionSetNode.into(),
             field_node: PyFieldNode.into(),
             document_node: PyDocumentNode.into(),
+            name_node: PyNameNode.into(),
         }
+    }
+
+    fn get_name_nome(&self, py: Python, name: &str) -> PyResult<PyObject> {
+        let name_node_kwargs = PyDict::new(py);
+
+        let name = PyString::new(py, name);
+        name_node_kwargs.set_item("value", name)?;
+
+        self.name_node.call(py,(), Some(name_node_kwargs))
+
     }
 
     fn convert_field_to_core_field(&self, py: Python, field: &apollo_compiler::hir::Field) -> PyResult<PyObject> {
@@ -86,8 +99,7 @@ impl CoreConversionContext {
         }
 
         //println!("Name");
-        let name = field.name().to_string();
-        let name = PyString::new(py, &name);
+        let name = self.get_name_nome(py,field.name())?;
         field_node_kwargs.set_item("name", name)?;
 
         //println!("Initing lists");
@@ -139,9 +151,8 @@ impl CoreConversionContext {
             let operation_kwargs = PyDict::new(py);
 
             if let Some(operation_name) = operation.name() {
-                let operation_name = operation_name.to_string();
+                let operation_name = self.get_name_nome(py,operation_name)?;
                 // FIXME is this necessary?
-                let operation_name = PyString::new(py, &operation_name);
                 //println!("Trying to set name!");
                 operation_kwargs.set_item("name", operation_name)?;
                 //println!("Name set!");

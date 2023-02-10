@@ -17,11 +17,11 @@ compiler.set_schema(schema)
 print("Schema validation result", compiler.validate())
 ast = None
 def validate_timing():
-    global ast
+    #global ast
     file_id = compiler.add_executable(operation)
     #print(file_id)
     validation_errors = compiler.validate_file(file_id)
-    ast = compiler.gql_core_ast(file_id)
+    #ast = compiler.gql_core_ast(file_id)
     #print("Validation errors:", not validation_errors)
 
 
@@ -32,7 +32,7 @@ num = 1
 time = timeit.timeit(validate_timing, number=num)
 print(f"Parsing & Validation on apollo-rs took an average of {time * 1000 / num} milliseconds ({num} iterations)")
 
-print(ast.to_dict())
+#print(ast.to_dict())
 
 profiler.stop()
 
