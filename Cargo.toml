@@ -1,6 +1,6 @@
 [package]
 name = "rustberry"
-version = "0.6.1"
+version = "0.6.4"
 edition = "2021"
 
 [lib]
@@ -15,5 +15,5 @@ apollo-compiler = { git = "https://github.com/apollographql/apollo-rs", rev="a88
 apollo-parser = { git = "https://github.com/apollographql/apollo-rs" }
 
 [dependencies.pyo3]
-version = "0.13"
+version = "0.18"
 features = ["extension-module"]

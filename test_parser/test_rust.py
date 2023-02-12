@@ -6,6 +6,7 @@ from util import get_sdl_str, get_query_str
 
 from pyinstrument import Profiler
 
+from graphql.language.ast import FieldNode
 
 schema = get_sdl_str()
 operation = get_query_str()
@@ -13,15 +14,20 @@ operation = get_query_str()
 compiler = QueryCompiler()
 compiler.set_schema(schema)
 
+from graphql.language.ast import FieldNode, OperationDefinitionNode
+
+m = OperationDefinitionNode()
+print(isinstance(m, FieldNode))
+
 # Validate the schema so it doesn't interfere with the timing
 print("Schema validation result", compiler.validate())
 ast = None
 def validate_timing():
-    #global ast
+    global ast
     file_id = compiler.add_executable(operation)
     #print(file_id)
     validation_errors = compiler.validate_file(file_id)
-    #ast = compiler.gql_core_ast(file_id)
+    ast = compiler.gql_core_ast_mirror(file_id)
     #print("Validation errors:", not validation_errors)
 
 
@@ -32,7 +38,11 @@ num = 1
 time = timeit.timeit(validate_timing, number=num)
 print(f"Parsing & Validation on apollo-rs took an average of {time * 1000 / num} milliseconds ({num} iterations)")
 
-#print(ast.to_dict())
+field_node = ast.definitions[0].selection_set.selections[0]
+
+print("Instance Check", isinstance(field_node, FieldNode))
+print(field_node.__class__)
+print(ast.definitions[0].selection_set.selections[0])
 
 profiler.stop()
 

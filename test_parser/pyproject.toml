@@ -9,7 +9,7 @@ packages = [{include = "test_parser"}]
 [tool.poetry.dependencies]
 python = "^3.10"
 
-rustberry = { file = "../target/wheels/rustberry-0.6.0-cp310-cp310-macosx_10_7_x86_64.whl" }
+rustberry = { file = "../target/wheels/rustberry-0.6.4-cp310-cp310-macosx_10_7_x86_64.whl" }
 graphql-core = "^3.2.3"
 strawberry-graphql = "^0.151.2"
 pyinstrument = "^4.4.0"

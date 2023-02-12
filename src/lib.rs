@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 use crate::apollo_compiler::database::{AstDatabase, HirDatabase, InputDatabase};
 use crate::apollo_compiler::validation::ValidationDatabase;
 use crate::ast::gql_core::converter::CoreConversionContext;
+use crate::ast::gql_core::mirror_converter::MirrorConversionContext;
 
 mod ast;
 
@@ -28,11 +29,6 @@ impl ValidationResult {
     }
 }
 
-#[pyclass]
-struct QueryCompiler {
-    compiler: ApolloCompiler,
-    conversion_context: CoreConversionContext,
-}
 
 #[pyclass]
 #[derive(Clone)]
@@ -48,6 +44,13 @@ impl FileId {
     }
 }
 
+#[pyclass]
+struct QueryCompiler {
+    compiler: ApolloCompiler,
+    conversion_context: CoreConversionContext,
+    mirror_conversion_context: MirrorConversionContext,
+}
+
 #[pymethods]
 impl QueryCompiler {
     #[new]
@@ -56,9 +59,13 @@ impl QueryCompiler {
         let conversion_context = Python::with_gil(|py| {
             CoreConversionContext::new(py)
         });
+        let mirror_conversion_context = Python::with_gil(|py| {
+            MirrorConversionContext::new(py)
+        });
         Self {
             compiler: ApolloCompiler::new(),
             conversion_context,
+            mirror_conversion_context,
         }
     }
 
@@ -123,6 +130,14 @@ impl QueryCompiler {
             let gql_core_ast =
                 self.conversion_context.convert_core_to_core_ast(py, &self.compiler, file_id.file_id);
             Ok(gql_core_ast?)
+    }
+
+    fn gql_core_ast_mirror(&mut self, py: Python<'_>, file_id: FileId) -> PyResult<PyObject> {
+        // let ast = self.compiler.db.ast(file_id.file_id);
+            let gql_core_ast =
+                self.mirror_conversion_context.convert_core_to_core_ast(py, &self.compiler, file_id.file_id);
+
+            Ok(PyCell::new(py, gql_core_ast)?.into())
     }
 }
 

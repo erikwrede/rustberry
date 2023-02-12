@@ -30,7 +30,7 @@ six = ">=1.5"
 
 [[package]]
 name = "rustberry"
-version = "0.6.0"
+version = "0.6.4"
 description = ""
 category = "main"
 optional = false
@@ -38,7 +38,7 @@ python-versions = ">=3.7"
 
 [package.source]
 type = "file"
-url = "../target/wheels/rustberry-0.6.0-cp310-cp310-macosx_10_7_x86_64.whl"
+url = "../target/wheels/rustberry-0.6.4-cp310-cp310-macosx_10_7_x86_64.whl"
 
 [[package]]
 name = "six"
@@ -87,7 +87,7 @@ python-versions = ">=3.7"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "b5d186ddab46e9042220392a38b5739ee1d4f09d6fd19af0339daa19283eb94b"
+content-hash = "a3b78020baacd77d53ce6ac79c654231ded54ec2f30e74ea245a0cea04107579"
 
 [metadata.files]
 graphql-core = [
@@ -151,7 +151,7 @@ python-dateutil = [
     {file = "python_dateutil-2.8.2-py2.py3-none-any.whl", hash = "sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9"},
 ]
 rustberry = [
-    {file = "rustberry-0.6.0-cp310-cp310-macosx_10_7_x86_64.whl", hash = "sha256:b1f81d425e7b9a342d73cca5a667840c39a5ad956efa6d80f11c93624a9781d3"},
+    {file = "rustberry-0.6.4-cp310-cp310-macosx_10_7_x86_64.whl", hash = "sha256:765490590d9e534a5dc49b95467a07c3139942cfc4b41e166cedb00fd76a4f8e"},
 ]
 six = [
     {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
