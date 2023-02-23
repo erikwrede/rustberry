@@ -156,6 +156,21 @@ def validate_timing():
 
 
 
-num = 100
-time = timeit.timeit(validate_timing, number=num)
-print(f"Execution on graphql-core took an average of {time * 1000 / num} milliseconds ({num} iterations)")
+import time
+def run_benchmarks(func, warmup_time=0.1):
+    # Warm up the function by calling it repeatedly for the specified time
+    # start_time = time.time()
+    # while time.time() < start_time + warmup_time:
+    #     func()
+
+    num = 3000
+    # Measure the time taken to call the function
+    time_taken = timeit.timeit(func, number=num)
+
+    print(f"Execution on graphql-core took an average of {time_taken * 1000 / num} milliseconds ({num} iterations)")
+    # Print the results
+    print(f"Time taken: {time_taken:.6f} seconds")
+
+# Example usage: benchmarking the built-in sum function
+
+run_benchmarks(validate_timing, 1)
