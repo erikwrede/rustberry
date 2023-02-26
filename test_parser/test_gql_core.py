@@ -19,6 +19,6 @@ def validate_timing():
     print("Validation errors:", validation_errors)
 
 
-num = 1
+num = 10
 time = timeit.timeit(validate_timing, number=num)
 print(f"Parsing & validation on graphql-core took an average of {time*1000 / num} milliseconds ({num} iterations)")

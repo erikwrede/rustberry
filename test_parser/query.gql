@@ -177,7 +177,6 @@
               avatarUrl
               id
               bot
-              __typename
               username
               userPermissions {
                 createSnippet
