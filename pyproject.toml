@@ -1,9 +1,10 @@
 [tool.poetry]
 name = "rustberry"
-version = "0.0.8"
-description = ""
+version = "0.0.9"
+description = "High-performance Rust-based GraphQL Tooling for Python"
 authors = ["Erik Wrede <erikwrede2@gmail.com>"]
 readme = "README.md"
+license = "MIT"
 packages = [{include = "rustberry"}]
 
 [tool.poetry.dependencies]
@@ -19,7 +20,7 @@ build-backend = "maturin"
 
 [project]
 name = "rustberry"
-requires-python = ">=3.7"
+requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
