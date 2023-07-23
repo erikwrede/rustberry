@@ -12,7 +12,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        python-version: [ "3.7", "3.8", "3.9", "3.10", "3.11" ]
+        python-version: [ "3.10", "3.11" ]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -48,7 +48,7 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        python-version: [ "3.7", "3.8", "3.9", "3.10", "3.11" ]
+        python-version: [ "3.10", "3.11" ]
         target: [ x64, x86 ]
     steps:
       - uses: actions/checkout@v3
@@ -78,9 +78,7 @@ jobs:
     strategy:
       matrix:
         # "3.7", "3.8", "3.9", "3.10", "3.11", "3.12.0-beta.3"
-        python-version: [{ version: "3.7", maturinV: "3.7" },
-                         { version: "3.8", maturinV: "3.8" },
-                         { version: "3.9", maturinV: "3.9" },
+        python-version: [
                          { version: "3.10", maturinV: "3.10" },
                          { version: "3.11", maturinV: "3.11" },
                          { version: "3.12.0-beta.3", maturinV: "3.12.0" } ]
@@ -114,9 +112,6 @@ jobs:
       matrix:
         python:
           [
-            { version: "3.7", abi: "cp37-cp37m" },
-            { version: "3.8", abi: "cp38-cp38" },
-            { version: "3.9", abi: "cp39-cp39" },
             { version: "3.10", abi: "cp310-cp310" },
             { version: "3.11", abi: "cp311-cp311" },
           ]
@@ -167,17 +162,16 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     needs: [ macos, windows, linux, linux-cross ]
+    environment:
+      name: pypi
+      url: https://pypi.org/p/rustberry
+    permissions:
+      id-token: write
     steps:
       - uses: actions/download-artifact@v3
         with:
           name: wheels
-      - uses: actions/setup-python@v4
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          python-version: 3.x
-      - name: Publish to PyPi
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: |
-          pip install --upgrade twine
-          twine upload --skip-existing *
+          packages-dir: wheels/
