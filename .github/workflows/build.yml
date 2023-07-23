@@ -21,7 +21,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: -i python3.10 --out dist
+          args: -i python --out dist
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
