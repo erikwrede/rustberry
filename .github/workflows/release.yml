@@ -33,7 +33,7 @@ jobs:
       - name: Build wheels - universal2-apple-darwin
         uses: PyO3/maturin-action@v1
         with:
-          args: -i python --release --universal2-apple-darwin --out dist
+          args: -i python --release --target universal2-apple-darwin --out dist
       - name: Install build wheel - universal2-apple-darwin
         run: |
           pip install --force-reinstall dist/rustberry*_universal2-apple-darwin.whl
