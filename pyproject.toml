@@ -10,6 +10,8 @@ packages = [{include = "rustberry"}]
 python = "^3.10"
 maturin = "^0.14.7"
 
+[tool.maturin]
+module-name = "rustberry._rustberry"
 
 [build-system]
 requires = ["maturin>=0.13,<0.14"]
