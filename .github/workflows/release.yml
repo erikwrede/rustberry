@@ -30,13 +30,13 @@ jobs:
         run: |
           pip install --force-reinstall dist/rustberry*.whl
           cd ~ && python -c 'import rustberry'
-      - name: Build wheels - universal2
+      - name: Build wheels - universal2-apple-darwin
         uses: PyO3/maturin-action@v1
         with:
-          args: -i python --release --universal2 --out dist
-      - name: Install build wheel - universal2
+          args: -i python --release --universal2-apple-darwin --out dist
+      - name: Install build wheel - universal2-apple-darwin
         run: |
-          pip install --force-reinstall dist/rustberry*_universal2.whl
+          pip install --force-reinstall dist/rustberry*_universal2-apple-darwin.whl
           cd ~ && python -c 'import rustberry'
       - name: Upload wheels
         uses: actions/upload-artifact@v3
@@ -77,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12.0-beta.3"]
+        python-version: ["3.12.0-beta.3"] # "3.7", "3.8", "3.9", "3.10", "3.11",
         target: [x86_64, i686]
     steps:
       - uses: actions/checkout@v3

@@ -8,7 +8,7 @@ packages = [{include = "rustberry"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-maturin = "^0.14.7"
+maturin = "1.1.0"
 
 [tool.maturin]
 module-name = "rustberry._rustberry"
