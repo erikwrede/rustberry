@@ -169,6 +169,7 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: wheels
+          path: dist/
       - name: output ls
         run: |
           ls -lrth

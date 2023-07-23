@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rustberry"
-version = "0.0.7"
+version = "0.0.8"
 description = ""
 authors = ["Erik Wrede <erikwrede2@gmail.com>"]
 readme = "README.md"
