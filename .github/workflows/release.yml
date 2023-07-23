@@ -12,7 +12,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        python-version: [ "3.10", "3.11" ]
+        python-version: [ "3.11" ]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -48,7 +48,7 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        python-version: [ "3.10", "3.11" ]
+        python-version: [ "3.11" ]
         target: [ x64, x86 ]
     steps:
       - uses: actions/checkout@v3
@@ -79,7 +79,6 @@ jobs:
       matrix:
         # "3.7", "3.8", "3.9", "3.10", "3.11", "3.12.0-beta.3"
         python-version: [
-                         { version: "3.10", maturinV: "3.10" },
                          { version: "3.11", maturinV: "3.11" },
                          { version: "3.12.0-beta.3", maturinV: "3.12" } ]
         target: [ x86_64, i686 ]
@@ -112,7 +111,6 @@ jobs:
       matrix:
         python:
           [
-            { version: "3.10", abi: "cp310-cp310" },
             { version: "3.11", abi: "cp311-cp311" },
           ]
         target: [ aarch64 ] # , armv7, s390x, ppc64le ]
@@ -171,7 +169,8 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: wheels
+      - name: output ls
+        run: |
+          ls -lrth
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: wheels/
