@@ -262,7 +262,7 @@ impl MirrorConversionContext {
                     .operation_type
                     .get_operation_type(operation.operation_type);
 
-                let directives = operation.directives.iter().map(|directive| {
+                let directives: Vec<DirectiveNode> = operation.directives.iter().map(|directive| {
                     self.convert_directive_to_core_directive(py, directive)
                 }).collect();
 
@@ -275,12 +275,16 @@ impl MirrorConversionContext {
                         self.convert_value_to_core_value(py, value)
                     });
 
+                    let variable_directives = variable.directives.iter().map(|directive| {
+                        self.convert_directive_to_core_directive(py, directive)
+                    }).collect();
+
                     VariableDefinitionNode {
                         variable: VariableNode {
                             name,
                         },
                         default_value,
-                        directives,
+                        directives: variable_directives,
                         r#type: variable_type,
                     }
                 }).collect();
