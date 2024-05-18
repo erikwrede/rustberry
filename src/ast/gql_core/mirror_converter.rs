@@ -1,5 +1,8 @@
+use std::ops::Deref;
+
 use apollo_compiler::{ExecutableDocument, Node};
 use apollo_compiler::executable::{Field, OperationType, Selection, SelectionSet};
+use apollo_compiler::schema::{Type, Value};
 use pyo3::{PyAny, Python};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -72,7 +75,6 @@ impl MirrorConversionContext {
     }
 
     fn convert_field_to_core_field(&self, py: Python, field: &Node<Field>) -> FieldNode {
-
         let selection_set = field.selection_set.selections.first()
             .map(|_| self.convert_selection_set_to_core_selection_set(py, &field.selection_set));
 
@@ -97,7 +99,6 @@ impl MirrorConversionContext {
     ) -> SelectionSetNode {
         //println!("Converting selection set...");
         let selection_set_kwargs = PyDict::new(py);
-        // FIXME do we NEED to use PyTuple here?
         let selections: Vec<FieldNode> = selection_set
             .selections
             .iter()
@@ -112,7 +113,126 @@ impl MirrorConversionContext {
             .collect();
 
         SelectionSetNode {
-            selections: selections,
+            selections,
+        }
+    }
+    fn convert_type_to_core_type(&self, py: Python, ty: &Type) -> PyObject {
+        /*
+        Named(NamedType),
+            NonNullNamed(NamedType),
+            List(Box<Type>),
+            NonNullList(Box<Type>),
+         */
+        match ty {
+            Type::Named(named_type) => {
+                let name = self.get_name_node(py, named_type.as_str());
+                let core_named_type = NamedTypeNode {
+                    name,
+                };
+                core_named_type.into_py(py)
+            }
+            Type::NonNullNamed(named_type) => {
+                let core_named_type = NonNullTypeNode {
+                    r#type: NamedTypeNode {
+                        name: self.get_name_node(py, named_type.as_str()),
+                    }.into_py(py),
+                };
+                core_named_type.into_py(py)
+            }
+            Type::List(list_type) => {
+                let core_list_type = ListTypeNode {
+                    r#type: self.convert_type_to_core_type(py, list_type),
+                };
+                core_list_type.into_py(py)
+            }
+            Type::NonNullList(list_type) => {
+                let core_list_type = NonNullTypeNode {
+                    r#type: ListTypeNode {
+                        r#type: self.convert_type_to_core_type(py, list_type),
+                    }.into_py(py),
+                };
+                core_list_type.into_py(py)
+            }
+        }
+    }
+    /*
+     Null,
+    Enum(Name),
+    Variable(Name),
+    String(
+        /// The value after escape sequences are resolved
+        NodeStr,
+    ),
+    Float(FloatValue),
+    Int(IntValue),
+    Boolean(bool),
+    List(Vec<Node<Value>>),
+    Object(Vec<(Name, Node<Value>)>),
+     */
+    fn convert_value_to_core_value(&self, py: Python, value: &Node<Value>) -> PyObject {
+        match value.deref() {
+            Value::Null => {
+                let core_value = NullValueNode {};
+                core_value.into_py(py)
+            }
+            Value::Enum(name) => {
+                let core_value = EnumValueNode {
+                    value: name.to_string(),
+                };
+                core_value.into_py(py)
+            }
+            Value::Variable(name) => {
+                let core_value = VariableNode {
+                    name: self.get_name_node(py, name.as_str()),
+                };
+                core_value.into_py(py)
+            }
+            Value::String(string) => {
+                let core_value = StringValueNode {
+                    value: string.to_string(),
+                    block: None, // FIXME do we have an equivalent in apollo rs
+                };
+                core_value.into_py(py)
+            }
+            Value::Float(float) => {
+                let core_value = FloatValueNode {
+                    value: float.to_string(),
+                };
+                core_value.into_py(py)
+            }
+            Value::Int(int) => {
+                let core_value = IntValueNode {
+                    value: int.to_string(),
+                };
+                core_value.into_py(py)
+            }
+            Value::Boolean(boolean) => {
+                let core_value = BooleanValueNode {
+                    value: *boolean,
+                };
+                core_value.into_py(py)
+            }
+            Value::List(values) => {
+                let core_values: Vec<PyObject> = values.iter().map(|value| {
+                    self.convert_value_to_core_value(py, value)
+                }).collect();
+                let core_value = ListValueNode {
+                    values: core_values,
+                };
+                core_value.into_py(py)
+            }
+            Value::Object(fields) => {
+                let core_fields: Vec<ObjectFieldNode> = fields.iter().map(|(name, value)| {
+                    ObjectFieldNode {
+                        name: self.get_name_node(py, name.as_str()),
+                        value: self.convert_value_to_core_value(py, value),
+                    }
+                }).collect();
+                let core_value = ObjectValueNode {
+                    fields: core_fields,
+                };
+                core_value.into_py(py)
+            }
         }
     }
 
@@ -134,13 +254,27 @@ impl MirrorConversionContext {
                     .operation_type
                     .get_operation_type(operation.operation_type);
 
-                /*
-                directives: PyTuple["DirectiveNode", ...]
-                variable_definitions: Tuple["VariableDefinitionNode", ...]
-                selection_set: "SelectionSetNode" */
-
                 let directives = &operation.directives;
-                let variable_definitions = &operation.variables;
+
+
+                let variable_definitions: Vec<VariableDefinitionNode> = operation.variables.iter().map(|variable| {
+                    let name = self.get_name_node(py, variable.name.as_str());
+                    let variable_type = self.convert_type_to_core_type(py, variable.ty.deref());
+
+                    let default_value = variable.default_value.as_ref().map(|value| {
+                        self.convert_value_to_core_value(py, value)
+                    });
+
+                    VariableDefinitionNode {
+                        variable: VariableNode {
+                            name,
+                        },
+                        r#type: variable_type,
+                        default_value,
+                        directives: vec![],
+                    }
+                }).collect();
+
                 let selection_set = &operation.selection_set;
 
                 let selection_set =
@@ -149,7 +283,7 @@ impl MirrorConversionContext {
                 OperationDefinitionNode {
                     operation: operation_type,
                     name: operation_name,
-                    variable_definitions: Vec::new(),
+                    variable_definitions,
                     directives: Vec::new(),
                     selection_set,
                 }
