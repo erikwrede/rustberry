@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rustberry"
-version = "0.0.13"
+version = "0.0.14"
 description = "High-performance Rust-based GraphQL Tooling for Python"
 authors = ["Erik Wrede <erikwrede2@gmail.com>"]
 readme = "README.md"
