@@ -8,6 +8,15 @@ pub struct NameNode {
     pub value: String,
 }
 
+#[pymethods]
+impl NameNode {
+    #[getter(__class__)]
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let name_node = py.import("graphql.language.ast")?.getattr("NameNode")?;
+        Ok(name_node.into())
+    }
+}
+
 #[pyclass]
 #[derive(Clone)]
 pub struct DocumentNode {
@@ -15,6 +24,14 @@ pub struct DocumentNode {
     pub definitions: Vec<OperationDefinitionNode>,
 }
 
+#[pymethods]
+impl DocumentNode {
+    #[getter(__class__)]
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let document_node = py.import("graphql.language.ast")?.getattr("DocumentNode")?;
+        Ok(document_node.into())
+    }
+}
 
 
 #[pyclass]
@@ -97,6 +114,8 @@ impl DirectiveNode {
 pub struct ArgumentNode {
     #[pyo3(get)]
     pub name: NameNode,
+    #[pyo3(get)]
+    pub value: PyObject // of type ValueNode - IntValueNode, FloatValueNode, StringValueNode, BooleanValueNode, EnumValueNode, ListValueNode, ObjectValueNode, NullValueNode
 }
 
 #[pymethods]
@@ -132,6 +151,7 @@ impl VariableDefinitionNode {
 
 //#region TypeNode
 #[pyclass]
+#[derive(Clone)]
 pub struct NamedTypeNode {
     #[pyo3(get)]
     pub name: NameNode,
@@ -147,6 +167,7 @@ impl NamedTypeNode {
 }
 
 #[pyclass]
+#[derive(Clone)]
 pub struct ListTypeNode {
     #[pyo3(get)]
     pub r#type: PyObject, // TypeNode - NamedTypeNode, ListTypeNode, NonNullTypeNode
@@ -162,6 +183,7 @@ impl ListTypeNode {
 }
 
 #[pyclass]
+#[derive(Clone)]
 pub struct NonNullTypeNode {
     #[pyo3(get)]
     pub r#type: PyObject, // NamedTypeNode or ListTypeNode
@@ -182,6 +204,7 @@ impl NonNullTypeNode {
 #[pyclass]
 #[derive(Clone)]
 pub struct VariableNode {
+    #[pyo3(get)]
     pub name: NameNode,
 }
 
@@ -195,7 +218,9 @@ impl VariableNode {
 }
 
 #[pyclass]
+#[derive(Clone)]
 pub struct IntValueNode {
+    #[pyo3(get)]
     pub value: String,
 }
 
@@ -210,7 +235,9 @@ impl IntValueNode {
 
 
 #[pyclass]
+#[derive(Clone)]
 pub struct FloatValueNode {
+    #[pyo3(get)]
     pub value: String,
 }
 
@@ -224,7 +251,9 @@ impl FloatValueNode {
 }
 
 #[pyclass]
+#[derive(Clone)]
 pub struct StringValueNode {
+    #[pyo3(get)]
     pub value: String,
     pub block: Option<bool>,
 }
@@ -239,7 +268,9 @@ impl StringValueNode {
 }
 
 #[pyclass]
+#[derive(Clone)]
 pub struct BooleanValueNode {
+    #[pyo3(get)]
     pub value: bool,
 }
 
@@ -253,6 +284,7 @@ impl BooleanValueNode {
 }
 
 #[pyclass]
+#[derive(Clone)]
 pub struct NullValueNode {}
 
 #[pymethods]
@@ -265,7 +297,9 @@ impl NullValueNode {
 }
 
 #[pyclass]
+#[derive(Clone)]
 pub struct EnumValueNode {
+    #[pyo3(get)]
     pub value: String,
 }
 
@@ -279,7 +313,9 @@ impl EnumValueNode {
 }
 
 #[pyclass]
+#[derive(Clone)]
 pub struct ListValueNode {
+    #[pyo3(get)]
     pub values: Vec<PyObject>, //of type ValueNode
 }
 
@@ -293,8 +329,11 @@ impl ListValueNode {
 }
 
 #[pyclass]
+#[derive(Clone)]
 pub struct ObjectFieldNode {
+    #[pyo3(get)]
     pub name: NameNode,
+    #[pyo3(get)]
     pub value: PyObject, //of type ValueNode
 }
 
@@ -308,7 +347,9 @@ impl ObjectFieldNode {
 }
 
 #[pyclass]
+#[derive(Clone)]
 pub struct ObjectValueNode {
+    #[pyo3(get)]
     pub fields: Vec<ObjectFieldNode>,
 }
 

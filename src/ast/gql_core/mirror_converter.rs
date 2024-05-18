@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use apollo_compiler::{ExecutableDocument, Node};
-use apollo_compiler::executable::{Field, OperationType, Selection, SelectionSet};
+use apollo_compiler::executable::{Argument, Field, OperationType, Selection, SelectionSet};
 use apollo_compiler::schema::{Type, Value};
 use pyo3::{PyAny, Python};
 use pyo3::prelude::*;
@@ -74,6 +74,15 @@ impl MirrorConversionContext {
         }
     }
 
+    fn convert_argument_to_core_argument(&self, py: Python, argument: &Node<Argument>) -> ArgumentNode {
+        let name = self.get_name_node(py, argument.name.as_str());
+        let value = self.convert_value_to_core_value(py, &argument.value);
+        ArgumentNode {
+            name,
+            value,
+        }
+    }
+
     fn convert_field_to_core_field(&self, py: Python, field: &Node<Field>) -> FieldNode {
         let selection_set = field.selection_set.selections.first()
             .map(|_| self.convert_selection_set_to_core_selection_set(py, &field.selection_set));
@@ -83,12 +92,16 @@ impl MirrorConversionContext {
 
         let name = self.get_name_node(py, field.name.as_str());
 
+        let arguments = field.arguments.iter().map(|argument| {
+            self.convert_argument_to_core_argument(py, argument)
+        }).collect();
+
         FieldNode {
             alias,
-            name: name,
-            arguments: vec![],
+            name,
+            arguments,
             directives: vec![],
-            selection_set: selection_set,
+            selection_set,
         }
     }
 
