@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use apollo_compiler::{ExecutableDocument, Node};
 use apollo_compiler::executable::{Argument, Field, OperationType, Selection, SelectionSet};
-use apollo_compiler::schema::{Type, Value};
+use apollo_compiler::schema::{Directive, Type, Value};
 use pyo3::{PyAny, Python};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -87,7 +87,6 @@ impl MirrorConversionContext {
         let selection_set = field.selection_set.selections.first()
             .map(|_| self.convert_selection_set_to_core_selection_set(py, &field.selection_set));
 
-
         let alias = field.alias.as_ref().map(|field_alias| self.get_name_node(py, field_alias.as_str()));
 
         let name = self.get_name_node(py, field.name.as_str());
@@ -96,11 +95,15 @@ impl MirrorConversionContext {
             self.convert_argument_to_core_argument(py, argument)
         }).collect();
 
+        let directives = field.directives.iter().map(|directive| {
+            self.convert_directive_to_core_directive(py, directive)
+        }).collect();
+
         FieldNode {
             alias,
             name,
             arguments,
-            directives: vec![],
+            directives,
             selection_set,
         }
     }
@@ -130,12 +133,6 @@ impl MirrorConversionContext {
         }
     }
     fn convert_type_to_core_type(&self, py: Python, ty: &Type) -> PyObject {
-        /*
-        Named(NamedType),
-            NonNullNamed(NamedType),
-            List(Box<Type>),
-            NonNullList(Box<Type>),
-         */
         match ty {
             Type::Named(named_type) => {
                 let name = self.get_name_node(py, named_type.as_str());
@@ -168,20 +165,7 @@ impl MirrorConversionContext {
             }
         }
     }
-    /*
-     Null,
-    Enum(Name),
-    Variable(Name),
-    String(
-        /// The value after escape sequences are resolved
-        NodeStr,
-    ),
-    Float(FloatValue),
-    Int(IntValue),
-    Boolean(bool),
-    List(Vec<Node<Value>>),
-    Object(Vec<(Name, Node<Value>)>),
-     */
+
     fn convert_value_to_core_value(&self, py: Python, value: &Node<Value>) -> PyObject {
         match value.deref() {
             Value::Null => {
@@ -249,6 +233,17 @@ impl MirrorConversionContext {
         }
     }
 
+    fn convert_directive_to_core_directive(&self, py: Python, directive: &Node<Directive>) -> DirectiveNode {
+        let name = self.get_name_node(py, directive.name.as_str());
+        let arguments = directive.arguments.iter().map(|argument| {
+            self.convert_argument_to_core_argument(py, argument)
+        }).collect();
+        DirectiveNode {
+            name,
+            arguments,
+        }
+    }
+
     pub fn convert_core_to_core_ast(
         self: &Self,
         py: Python,
@@ -267,7 +262,9 @@ impl MirrorConversionContext {
                     .operation_type
                     .get_operation_type(operation.operation_type);
 
-                let directives = &operation.directives;
+                let directives = operation.directives.iter().map(|directive| {
+                    self.convert_directive_to_core_directive(py, directive)
+                }).collect();
 
 
                 let variable_definitions: Vec<VariableDefinitionNode> = operation.variables.iter().map(|variable| {
@@ -282,9 +279,9 @@ impl MirrorConversionContext {
                         variable: VariableNode {
                             name,
                         },
-                        r#type: variable_type,
                         default_value,
-                        directives: vec![],
+                        directives,
+                        r#type: variable_type,
                     }
                 }).collect();
 
@@ -293,11 +290,15 @@ impl MirrorConversionContext {
                 let selection_set =
                     self.convert_selection_set_to_core_selection_set(py, selection_set);
 
+                let directives = operation.directives.iter().map(|directive| {
+                    self.convert_directive_to_core_directive(py, directive)
+                }).collect();
+
                 OperationDefinitionNode {
                     operation: operation_type,
                     name: operation_name,
                     variable_definitions,
-                    directives: Vec::new(),
+                    directives,
                     selection_set,
                 }
             })
