@@ -104,7 +104,7 @@ pub struct FieldNode {
 impl FieldNode {
     #[getter(__class__)]
     pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import("graphql.language.ast")?.getattr("FieldNode")?;
+        let field_node = py.import_bound("graphql.language.ast")?.getattr("FieldNode")?;
         Ok(field_node.into())
     }
 }

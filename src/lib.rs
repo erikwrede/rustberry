@@ -1,53 +1,30 @@
 //use pyo3::wrap_pyfunction;
 extern crate apollo_compiler;
 
-use apollo_compiler::{ApolloCompiler, ApolloDiagnostic, FileId as ApolloFileId};
-use apollo_compiler::database::db::Upcast;
-use apollo_compiler::diagnostics::{DiagnosticData, Label};
-// this is private :( use apollo_compiler::validation::validation_db::{validate_executable};
+use apollo_compiler::{ExecutableDocument, Schema};
+use apollo_compiler::validation::Valid;
 use pyo3::prelude::*;
 
-use crate::apollo_compiler::database::{AstDatabase, HirDatabase, InputDatabase};
-use crate::apollo_compiler::validation::ValidationDatabase;
 use crate::ast::gql_core::converter::CoreConversionContext;
 use crate::ast::gql_core::mirror_converter::MirrorConversionContext;
+use crate::ast::gql_core::reduced_core_mirror::DocumentNode;
 
 mod ast;
 
 //use pyo3::types::{PyString,PyUnicode};
 
-
 #[pyclass]
-struct ValidationResult {
-    diagnostics: Vec<ApolloDiagnostic>,
+#[derive(Clone)]
+struct Document {
+    document: ExecutableDocument,
 }
 
 #[pymethods]
-impl ValidationResult {
-    fn get_diagnostics(&self) -> PyResult<()> {
-        //self.diagnostics.clone();
-        Ok(())
-    }
-}
-
-
-#[pyclass]
-#[derive(Clone)]
-struct FileId {
-    file_id: ApolloFileId,
-}
-
-impl FileId {
-    fn from_file_id(file_id: ApolloFileId) -> Self {
-        Self {
-            file_id,
-        }
-    }
-}
+impl Document {}
 
 #[pyclass]
 struct QueryCompiler {
-    compiler: ApolloCompiler,
+    schema: Valid<Schema>,
     conversion_context: CoreConversionContext,
     mirror_conversion_context: MirrorConversionContext,
 }
@@ -55,98 +32,87 @@ struct QueryCompiler {
 #[pymethods]
 impl QueryCompiler {
     #[new]
-    fn new() -> Self {
-        // create and return a new instance of MyRustObject
-        let conversion_context = Python::with_gil(|py| {
-            CoreConversionContext::new(py)
-        });
-        let mirror_conversion_context = Python::with_gil(|py| {
-            MirrorConversionContext::new(py)
-        });
+    fn new(schema: String) -> Self {
+        let apollo_schema = Schema::parse(schema.clone(), "document.graphql").unwrap();
+        let conversion_context = Python::with_gil(|py| CoreConversionContext::new(py));
+        let mirror_conversion_context = Python::with_gil(|py| MirrorConversionContext::new(py));
+
         Self {
-            compiler: ApolloCompiler::new(),
+            schema: Valid::assume_valid(apollo_schema),
             conversion_context,
             mirror_conversion_context,
         }
     }
 
-    fn set_schema(&mut self, schema: &str) -> PyResult<()> {
-        self.compiler.add_type_system(schema, "schema.graphql");
-        Ok(())
-    }
+    fn parse(&mut self, document: &str) -> PyResult<Document> {
+        let result = ExecutableDocument::parse(&self.schema, document, "document.graphql");
 
-
-    fn add_executable(&mut self, contents: &str) -> PyResult<FileId> {
-        // the path is optional and just used in diagnostics, it doesn't need to be unique
-        let file_id = self.compiler.add_executable(contents, "");
-        // return the file id as a u64
-        Ok(FileId::from_file_id(file_id))
-    }
-
-    fn add_validate(&mut self, contents: &str) -> PyResult<bool> {
-        let file_id = self.add_executable(contents).unwrap();
-        let validation_result = self.validate_file(file_id);
-        Ok(validation_result.unwrap())
-    }
-
-    fn validate_file(&mut self, file_id: FileId) -> PyResult<bool> {
-        //self.compiler.db.storage.
-        //self.compiler.db.
-        //let diagnostics = validate_executable(self.compiler.db,file_id);
-        let file_id = file_id.file_id;
-        //let diagnostics = self.compiler.db.validate_operation_definitions(file_id);
-        // extracted from ast.rs/check_syntax - we ONLY want to check the syntax for a single ast, not traverse the entire AST
-        // - there is no cached method on the db available yet
-        let mut diagnostics = self.compiler.db.ast(file_id)
-                .errors()
-                .into_iter()
-                .map(|err| {
-                    ApolloDiagnostic::new(
-                        self.compiler.db.upcast(),
-                        (file_id, err.index(), err.data().len()).into(),
-                        DiagnosticData::SyntaxError {
-                            message: err.message().into(),
-                        },
-                    )
-                    .label(Label::new(
-                        (file_id, err.index(), err.data().len()),
-                        err.message(),
-                    ))
-                })
-                .collect::<Vec<ApolloDiagnostic>>();
-
-        diagnostics.extend(self.compiler.db.validate_executable(file_id));
-
-        let errors_count = diagnostics.iter().filter(|d| d.data.is_error()).count();
-        for diagnostic in &diagnostics {
-            println!("{diagnostic}");
+        match result {
+            Ok(valid_doc) => Ok(Document {
+                document: valid_doc,
+            }),
+            Err(with_errors) => {
+                let errors = with_errors.errors;
+                panic!("{:?}", errors);
+                // let rustberry_errors = errors
+                //     .iter()
+                //     .map(|e| GraphQLError {
+                //         compiler_error: ApolloGraphQLError::new(
+                //             e.error.unstable_compat_message().unwrap_or(e.to_string()),
+                //             e.error.location(),
+                //             e.sources,
+                //         ),
+                //     });
+                // Err(PyErr::new::<ApolloGraphQLError, _>(format!("{:?}", rustberry_errors)))
+            }
         }
-        Ok(errors_count == 0)
     }
 
-    fn validate(&mut self) -> PyResult<bool> {
-        // implement the validate function here
-        // fixme validate is not sufficient, the entire database is validated here. We only want our file to be validated
-        let diagnostics = self.compiler.validate();
+    fn add_validate(&mut self, document: &str) -> PyResult<bool> {
+        let parsed_result = ExecutableDocument::parse(&self.schema, document, "document.graphql");
 
-        let errors_count = diagnostics.iter().filter(|d| d.data.is_error()).count();
+        if parsed_result.is_err() {
+            return Ok(false);
+        }
 
-        Ok(errors_count == 0)
+        Ok(parsed_result.unwrap().validate(&self.schema).is_ok())
     }
 
-    fn gql_core_ast(&mut self, py: Python<'_>, file_id: FileId) -> PyResult<PyObject> {
+    fn validate(&mut self, document: Document) -> PyResult<bool> {
+        let result = document.document.validate(&self.schema);
+
+        match result {
+            Ok(valid_doc) => Ok(true),
+            Err(with_errors) => {
+                let errors = with_errors.errors;
+                // let rustberry_errors = errors
+                //     .iter()
+                //     .map(|e| GraphQLError {
+                //         compiler_error: ApolloGraphQLError::new(
+                //             e.error.unstable_compat_message().unwrap_or(e.to_string()),
+                //             e.error.location(),
+                //             e.sources,
+                //         ),
+                //     });
+                Ok(false)
+            }
+        }
+    }
+    fn gql_core_ast(&mut self, py: Python<'_>, document: &Document) -> PyResult<PyObject> {
         // let ast = self.compiler.db.ast(file_id.file_id);
-            let gql_core_ast =
-                self.conversion_context.convert_core_to_core_ast(py, &self.compiler, file_id.file_id);
-            Ok(gql_core_ast?)
+        let gql_core_ast = self
+            .conversion_context
+            .convert_core_to_core_ast(py, &document.document);
+        Ok(gql_core_ast?)
     }
 
-    fn gql_core_ast_mirror(&mut self, py: Python<'_>, file_id: FileId) -> PyResult<PyObject> {
+    fn gql_core_ast_mirror(&mut self, py: Python<'_>, document: &Document) -> PyResult<Py<DocumentNode>> {
         // let ast = self.compiler.db.ast(file_id.file_id);
-            let gql_core_ast =
-                self.mirror_conversion_context.convert_core_to_core_ast(py, &self.compiler, file_id.file_id);
+        let gql_core_ast = self
+            .mirror_conversion_context
+            .convert_core_to_core_ast(py, &document.document);
 
-            Ok(PyCell::new(py, gql_core_ast)?.into())
+        Py::new(py, gql_core_ast)
     }
 }
 

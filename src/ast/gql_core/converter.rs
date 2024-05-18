@@ -1,18 +1,8 @@
-use std::sync::Arc;
-
-use apollo_compiler::{ApolloCompiler, ApolloDiagnostic, FileId};
-use apollo_compiler::database::{AstDatabase, HirDatabase, InputDatabase};
-use apollo_compiler::database::hir::{FragmentDefinition, OperationDefinition};
-use apollo_compiler::hir::{ByName, OperationType};
+use apollo_compiler::{ExecutableDocument, Node};
+use apollo_compiler::executable::{Field, OperationType, Selection, SelectionSet};
 use pyo3::{PyAny, Python};
-use pyo3::callback::IntoPyCallbackOutput;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyString};
-
-pub fn convert_to_core_ast(compiler: &ApolloCompiler, file_id: FileId) {
-    let ast: Arc<Vec<Arc<OperationDefinition>>> = compiler.db.operations(file_id);
-    let ast: ByName<FragmentDefinition> = compiler.db.fragments(file_id);
-}
 
 struct CoreOperationType {
     Query: Py<PyAny>,
@@ -35,9 +25,9 @@ impl CoreOperationType {
 
     fn get_operation_type(&self, operation_type: OperationType) -> Py<PyAny> {
         let operation_type = match operation_type {
-            apollo_compiler::hir::OperationType::Query => self.Query.to_owned(),
-            apollo_compiler::hir::OperationType::Mutation => self.Mutation.to_owned(),
-            apollo_compiler::hir::OperationType::Subscription => self.Subscription.to_owned(),
+            OperationType::Query => self.Query.to_owned(),
+            OperationType::Mutation => self.Mutation.to_owned(),
+            OperationType::Subscription => self.Subscription.to_owned(),
         };
         operation_type
     }
@@ -79,27 +69,26 @@ impl CoreConversionContext {
         let name = PyString::new(py, name);
         name_node_kwargs.set_item("value", name)?;
 
-        self.name_node.call(py,(), Some(name_node_kwargs))
-
+        self.name_node.call(py, (), Some(name_node_kwargs))
     }
 
-    fn convert_field_to_core_field(&self, py: Python, field: &apollo_compiler::hir::Field) -> PyResult<PyObject> {
+    fn convert_field_to_core_field(&self, py: Python, field: &Node<Field>) -> PyResult<PyObject> {
         //println!("Converting field to core field...");
         let field_node_kwargs = PyDict::new(py);
-        if field.selection_set().selection().len() > 0 {
+        if field.selection_set.selections.len() > 0 {
             //println!("Field has selection set");
-            let selection_set = self.convert_selection_set_to_core_selection_set(py, field.selection_set())?;
+            let selection_set = self.convert_selection_set_to_core_selection_set(py, &field.selection_set)?;
             field_node_kwargs.set_item("selection_set", selection_set)?;
             //println!("Selection set converted!");
         }
 
-            //println!("Alias");
-        if let Some(alias) = field.alias() {
-            field_node_kwargs.set_item("alias", PyString::new(py, alias.0.as_str()))?;
+        //println!("Alias");
+        if let Some(alias) = &field.alias {
+            field_node_kwargs.set_item("alias", PyString::new(py, alias.as_str()))?;
         }
 
         //println!("Name");
-        let name = self.get_name_nome(py,field.name())?;
+        let name = self.get_name_nome(py, field.name.as_str())?;
         field_node_kwargs.set_item("name", name)?;
 
         //println!("Initing lists");
@@ -118,17 +107,17 @@ impl CoreConversionContext {
         self.field_node.call(py, (), Some(field_node_kwargs))
     }
 
-    fn convert_selection_set_to_core_selection_set(&self, py: Python, selection_set: &apollo_compiler::hir::SelectionSet) -> PyResult<PyObject> {
+    fn convert_selection_set_to_core_selection_set(&self, py: Python, selection_set: &SelectionSet) -> PyResult<PyObject> {
         //println!("Converting selection set...");
         let selection_set_kwargs = PyDict::new(py);
         // FIXME do we NEED to use PyTuple here?
         let selections = PyList::empty(py);
 
-        for selection in selection_set.selection() {
+        for selection in &selection_set.selections {
             let core_selection = match selection {
-                apollo_compiler::hir::Selection::Field(field) => Some(self.convert_field_to_core_field(py, field)),
-                apollo_compiler::hir::Selection::FragmentSpread(fragment_spread) => None,//self.convert_fragment_spread_to_core_fragment_spread(py, fragment_spread),
-                apollo_compiler::hir::Selection::InlineFragment(inline_fragment) => None,// self.convert_inline_fragment_to_core_inline_fragment(py, inline_fragment),
+                Selection::Field(field) => Some(self.convert_field_to_core_field(py, field)),
+                Selection::FragmentSpread(fragment_spread) => None,//self.convert_fragment_spread_to_core_fragment_spread(py, fragment_spread),
+                Selection::InlineFragment(inline_fragment) => None,// self.convert_inline_fragment_to_core_inline_fragment(py, inline_fragment),
             };
             if let Some(core_selection) = core_selection {
                 //println!("Appending new Selection to the set...");
@@ -141,17 +130,17 @@ impl CoreConversionContext {
         self.selection_set_node.call(py, (), Some(selection_set_kwargs))
     }
 
-    pub fn convert_core_to_core_ast(self: &Self, py: Python, compiler: &ApolloCompiler, file_id: FileId) -> PyResult<PyObject> {
-        let operations: Arc<Vec<Arc<OperationDefinition>>> = compiler.db.operations(file_id);
-        let fragments: ByName<FragmentDefinition> = compiler.db.fragments(file_id);
+    pub fn convert_core_to_core_ast(self: &Self, py: Python, document: &ExecutableDocument) -> PyResult<PyObject> {
+        let operations = document.all_operations();
+        let fragments = &document.fragments;
 
         let core_operations = PyList::empty(py);
 
-        for operation in operations.iter() {
+        for operation in operations {
             let operation_kwargs = PyDict::new(py);
 
-            if let Some(operation_name) = operation.name() {
-                let operation_name = self.get_name_nome(py,operation_name)?;
+            if let Some(operation_name) = &operation.name{
+                let operation_name = self.get_name_nome(py, operation_name)?;
                 // FIXME is this necessary?
                 //println!("Trying to set name!");
                 operation_kwargs.set_item("name", operation_name)?;
@@ -159,7 +148,7 @@ impl CoreConversionContext {
             }
 
 
-            let operation_type = self.operation_type.get_operation_type(operation.operation_ty());
+            let operation_type = self.operation_type.get_operation_type(operation.operation_type);
 
             //println!("Operation type resolved!");
             /*
@@ -167,9 +156,9 @@ impl CoreConversionContext {
             variable_definitions: Tuple["VariableDefinitionNode", ...]
             selection_set: "SelectionSetNode" */
 
-            let directives = operation.directives();
-            let variable_definitions = operation.variables();
-            let selection_set = operation.selection_set();
+            let directives = &operation.directives;
+            let variable_definitions = &operation.variables;
+            let selection_set = &operation.selection_set;
 
             //println!("Selection sett, directives, variables done!");
 

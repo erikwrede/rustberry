@@ -1,4 +1,8 @@
 //pub mod core_mirror;
 pub mod converter;
+pub mod error;
+pub mod location;
 pub(crate) mod mirror_converter;
-mod reduced_core_mirror;
+pub mod reduced_core_mirror;
+
+mod imports;

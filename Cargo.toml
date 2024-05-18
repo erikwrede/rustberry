@@ -11,9 +11,9 @@ crate-type = ["cdylib"]
 name = "rustberry._rustberry"
 
 [dependencies]
-apollo-compiler = { git = "https://github.com/apollographql/apollo-rs", rev="6a0b13f191cc77f0cfc76913e86b0a223f427d32"}
+apollo-compiler = { git = "https://github.com/apollographql/apollo-rs"}
 apollo-parser = { git = "https://github.com/apollographql/apollo-rs" }
 
 [dependencies.pyo3]
-version = "0.18"
+version = "0.21.2"
 features = ["extension-module"]
