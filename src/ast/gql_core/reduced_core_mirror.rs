@@ -15,6 +15,11 @@ impl NameNode {
         let name_node = py.import("graphql.language.ast")?.getattr("NameNode")?;
         Ok(name_node.into())
     }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "name"
+    }
 }
 
 #[pyclass]
@@ -28,11 +33,15 @@ pub struct DocumentNode {
 impl DocumentNode {
     #[getter(__class__)]
     pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let document_node = py.import("graphql.language.ast")?.getattr("DocumentNode")?;
+        let document_node = py.import_bound("graphql.language.ast")?.getattr("DocumentNode")?;
         Ok(document_node.into())
     }
-}
 
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "document"
+    }
+}
 
 #[pyclass]
 #[derive(Clone)]
@@ -56,6 +65,11 @@ impl OperationDefinitionNode {
         let field_node = py.import("graphql.language.ast")?.getattr("OperationDefinitionNode")?;
         Ok(field_node.into())
     }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "operation_definition"
+    }
 }
 
 #[pyclass]
@@ -65,6 +79,13 @@ pub struct SelectionSetNode {
     pub selections: Vec<FieldNode>,
 }
 
+#[pymethods]
+impl SelectionSetNode {
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "selection_set"
+    }
+}
 
 #[pyclass]
 #[derive(Clone)]
@@ -88,6 +109,11 @@ impl FieldNode {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("FieldNode")?;
         Ok(field_node.into())
     }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "field"
+    }
 }
 
 #[pyclass]
@@ -106,8 +132,12 @@ impl DirectiveNode {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("DirectiveNode")?;
         Ok(field_node.into())
     }
-}
 
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "directive"
+    }
+}
 
 #[pyclass]
 #[derive(Clone)]
@@ -124,6 +154,11 @@ impl ArgumentNode {
     pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("ArgumentNode")?;
         Ok(field_node.into())
+    }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "argument"
     }
 }
 
@@ -147,6 +182,11 @@ impl VariableDefinitionNode {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("VariableDefinitionNode")?;
         Ok(field_node.into())
     }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "variable_definition"
+    }
 }
 
 //#region TypeNode
@@ -164,6 +204,11 @@ impl NamedTypeNode {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("NamedTypeNode")?;
         Ok(field_node.into())
     }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "named_type"
+    }
 }
 
 #[pyclass]
@@ -179,6 +224,11 @@ impl ListTypeNode {
     pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("ListTypeNode")?;
         Ok(field_node.into())
+    }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "list_type"
     }
 }
 
@@ -196,11 +246,15 @@ impl NonNullTypeNode {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("NonNullTypeNode")?;
         Ok(field_node.into())
     }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "non_null_type"
+    }
 }
 //#endregion: TypeNode
 
 //#region ValueNode
-
 #[pyclass]
 #[derive(Clone)]
 pub struct VariableNode {
@@ -214,6 +268,11 @@ impl VariableNode {
     pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("VariableNode")?;
         Ok(field_node.into())
+    }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "variable"
     }
 }
 
@@ -231,8 +290,12 @@ impl IntValueNode {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("IntValueNode")?;
         Ok(field_node.into())
     }
-}
 
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "int_value"
+    }
+}
 
 #[pyclass]
 #[derive(Clone)]
@@ -247,6 +310,11 @@ impl FloatValueNode {
     pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("FloatValueNode")?;
         Ok(field_node.into())
+    }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "float_value"
     }
 }
 
@@ -265,6 +333,11 @@ impl StringValueNode {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("StringValueNode")?;
         Ok(field_node.into())
     }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "string_value"
+    }
 }
 
 #[pyclass]
@@ -281,6 +354,11 @@ impl BooleanValueNode {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("BooleanValueNode")?;
         Ok(field_node.into())
     }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "boolean_value"
+    }
 }
 
 #[pyclass]
@@ -293,6 +371,11 @@ impl NullValueNode {
     pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("NullValueNode")?;
         Ok(field_node.into())
+    }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "null_value"
     }
 }
 
@@ -310,6 +393,11 @@ impl EnumValueNode {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("EnumValueNode")?;
         Ok(field_node.into())
     }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "enum_value"
+    }
 }
 
 #[pyclass]
@@ -325,6 +413,11 @@ impl ListValueNode {
     pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("ListValueNode")?;
         Ok(field_node.into())
+    }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "list_value"
     }
 }
 
@@ -344,6 +437,11 @@ impl ObjectFieldNode {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("ObjectFieldNode")?;
         Ok(field_node.into())
     }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "object_field"
+    }
 }
 
 #[pyclass]
@@ -360,8 +458,10 @@ impl ObjectValueNode {
         let field_node = py.import_bound("graphql.language.ast")?.getattr("ObjectValueNode")?;
         Ok(field_node.into())
     }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "object_value"
+    }
 }
-
-
-
 //#endregion: ValueNode
