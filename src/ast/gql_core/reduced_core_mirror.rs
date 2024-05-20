@@ -82,6 +82,12 @@ pub struct SelectionSetNode {
 #[pymethods]
 impl SelectionSetNode {
     #[getter]
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let field_node = py.import_bound("graphql.language.ast")?.getattr("SelectionSetNode")?;
+        Ok(field_node.into())
+    }
+
+    #[getter]
     pub fn kind(&self) -> &'static str {
         "selection_set"
     }
@@ -323,6 +329,7 @@ impl FloatValueNode {
 pub struct StringValueNode {
     #[pyo3(get)]
     pub value: String,
+    #[pyo3(get)]
     pub block: Option<bool>,
 }
 
