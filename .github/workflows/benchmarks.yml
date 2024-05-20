@@ -34,7 +34,7 @@ jobs:
           pip install -r requirements.txt
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v2
-        working-directory: test_parser
         with:
+          working-directory: test_parser
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: pytest benchmarks --codspeed
