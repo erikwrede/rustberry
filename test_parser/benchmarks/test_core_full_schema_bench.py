@@ -20,6 +20,7 @@ class Query:
         ]
 
     def resolve_conference(root, info, id):
+        print("i was called")
         # Here, you'd typically fetch conference data from a database or an API.
         # For the sake of this example, we're returning static data.
         if id == "pycon-it-2024":
@@ -170,6 +171,71 @@ query ConferenceQuery {
 } 	
 
 """
+operation_large = """
+query ConferenceQuery {
+	a: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	b: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	c: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	d: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}	
+} 	
+
+"""
 
 from graphql.utilities import get_introspection_query, build_client_schema
 from graphql import parse, print_schema
@@ -216,5 +282,18 @@ def test_pure_execution_core(benchmark):
 @pytest.mark.benchmark
 def test_pure_execution_rustberry(benchmark):
     document = compiler.parse(operation)
+    query = compiler.gql_core_ast_mirror(document)
+    benchmark(execute, schema, query)
+
+
+
+@pytest.mark.benchmark
+def test_pure_execution_core_large(benchmark):
+    query = parse(operation_large)
+    benchmark(execute, schema, query)
+
+@pytest.mark.benchmark
+def test_pure_execution_rustberry_large(benchmark):
+    document = compiler.parse(operation_large)
     query = compiler.gql_core_ast_mirror(document)
     benchmark(execute, schema, query)
