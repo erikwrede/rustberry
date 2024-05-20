@@ -29,7 +29,7 @@ jobs:
           pip install --no-index --find-links=dist/ rustberry
       - name: Setup Benchmarks
         working-directory: test_parser
-        run:
+        run: |
           poetry export --with test --with dev --without-hashes --without local --output requirements.txt
           pip install -r requirements.txt
       - name: Run benchmarks
