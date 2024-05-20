@@ -15,7 +15,6 @@ graphql-core = "^3.2.3"
 pytest = "^8.2.1"
 
 [tool.poetry.group.local.dependencies]
-rustberry = { file = "../target/wheels/rustberry-0.0.14-cp311-cp311-macosx_11_0_arm64.whl" }
 
 [tool.poetry.group.dev.dependencies]
 pytest-codspeed = "^2.2.1"

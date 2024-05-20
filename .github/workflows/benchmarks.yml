@@ -31,6 +31,7 @@ jobs:
         working-directory: test_parser
         run: |
           poetry export --with test --with dev --without-hashes --without local --output requirements.txt
+          cat requirements.txt
           pip install -r requirements.txt
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v2
