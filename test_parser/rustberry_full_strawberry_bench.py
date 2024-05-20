@@ -1,8 +1,8 @@
-import timeit
-
 import strawberry
+import timeit
 from strawberry.schema import BaseSchema
 from strawberry.schema.schema import DEFAULT_ALLOWED_OPERATION_TYPES
+
 from rustberry import QueryCompiler
 
 
@@ -18,7 +18,8 @@ class Query:
         return "Hello, world!"
 
     @strawberry.field
-    def greeting(self, info) -> str:
+    def greeting(self, info, b: str | None) -> str:
+        print("got b", b)
         return f"Hello, ABC!"
 
     @strawberry.field
@@ -29,10 +30,7 @@ class Query:
 schema = strawberry.Schema(query=Query)
 
 schema_str = schema.as_str()
-compiler = QueryCompiler()
-compiler.set_schema(schema_str)
-
-compiler.validate()
+compiler = QueryCompiler(schema_str)
 
 from strawberry.schema.execute import *
 
@@ -60,8 +58,10 @@ def execute_sync_patch(
         with extensions_runner.parsing():
             try:
                 if not execution_context.graphql_document:
-                    file_id = compiler.add_executable(execution_context.query)
-                    execution_context.graphql_document = compiler.gql_core_ast_mirror(file_id)
+                    document = compiler.parse(execution_context.query)
+                    execution_context.graphql_document = compiler.gql_core_ast_mirror(document)
+                    # print document from ast
+                    # print()
             except GraphQLError as error:
                 execution_context.errors = [error]
                 process_errors([error], execution_context)
@@ -86,7 +86,7 @@ def execute_sync_patch(
             raise InvalidOperationTypeError(execution_context.operation_type)
 
         with extensions_runner.validation():
-            compiler.validate_file(file_id)
+            compiler.validate(document)
             if execution_context.errors:
                 process_errors(execution_context.errors, execution_context)
                 return ExecutionResult(data=None, errors=execution_context.errors)
@@ -130,13 +130,14 @@ def execute_sync_patch(
         extensions=extensions_runner.get_extensions_results_sync(),
     )
 
+
 # Monkey Patch execution
 
 
 def validate_timing():
     execution_context = ExecutionContext(
         query="""
-                { hello, greeting, fruits { name } }
+                { hello, greeting(b: "abc"), fruits { name } }
                 """,
         schema=schema,
         context=None,
@@ -155,8 +156,6 @@ def validate_timing():
     )
 
 
-
-import time
 def run_benchmarks(func, warmup_time=0.1):
     # Warm up the function by calling it repeatedly for the specified time
     # start_time = time.time()
@@ -170,6 +169,7 @@ def run_benchmarks(func, warmup_time=0.1):
     print(f"Execution on graphql-core took an average of {time_taken * 1000 / num} milliseconds ({num} iterations)")
     # Print the results
     print(f"Time taken: {time_taken:.6f} seconds")
+
 
 # Example usage: benchmarking the built-in sum function
 

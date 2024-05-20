@@ -1,0 +1,225 @@
+{
+  issues(search: "string", in: [TITLE], first: 1, last: 1) {
+    count
+    nodes {
+      alertManagementAlerts(
+        iid: "string"
+        statuses: [TRIGGERED]
+        sort: STARTED_AT_ASC
+        domain: operations
+        search: "string"
+        assigneeUsername: "string"
+        after: "string"
+        before: "string"
+        first: 1
+        last: 1
+      ) {
+        nodes {
+          assignees {
+            nodes {
+              id
+              publicEmail
+              avatarUrl
+            }
+          }
+        }
+      }
+      assignees(after: "string", before: "string", first: 1, last: 1) {
+        nodes {
+          id
+          starredProjects {
+            nodes {
+              name
+              id
+              projectMembers {
+                nodes {
+                  accessLevel {
+                    integerValue
+                  }
+                  createdBy {
+                    id
+                    name
+                    publicEmail
+                    assignedMergeRequests {
+                      nodes{
+                        allowCollaboration
+                        approvalsRequired
+                        approvalState {
+                          rules {
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      author {
+        id
+      }
+      blocked
+      blockedByCount
+      blockedByIssues(after: "string", before: "string", first: 1, last: 1) {
+        nodes {
+          id
+        }
+      }
+      blockingCount
+      closedAsDuplicateOf {
+        id
+      }
+      closedAt
+      confidential
+      createNoteEmail
+      createdAt
+      currentUserTodos(
+        after: "string"
+        before: "string"
+        first: 1
+        last: 1
+        state: pending
+      ) {
+        edges {
+          cursor
+          node {
+            createdAt
+            author {
+              publicEmail
+            }
+          }
+        }
+      }
+      customerRelationsContacts(
+        after: "string"
+        before: "string"
+        first: 1
+        last: 1
+      ) {
+        edges {
+          cursor
+          node {
+            active
+            createdAt
+            description
+            email
+            firstName
+            id
+            lastName
+            phone
+            updatedAt
+          }
+        }
+        nodes {
+          active
+          createdAt
+          description
+          email
+          firstName
+          id
+          lastName
+          organization {
+            active
+            createdAt
+            defaultRate
+            description
+            id
+            name
+            updatedAt
+          }
+          phone
+          updatedAt
+        }
+        pageInfo {
+          endCursor
+          hasNextPage
+          hasPreviousPage
+          startCursor
+        }
+      }
+      description
+      descriptionHtml
+      discussionLocked
+      downvotes
+      dueDate
+      emailsDisabled
+      epic {
+        id
+      }
+      hasEpic
+      healthStatus
+      hidden
+      humanTimeEstimate
+      humanTotalTimeSpent
+      id
+      iid
+      labels(after: "string", before: "string", first: 1, last: 1) {
+        nodes {
+          color
+        }
+      }
+      mergeRequestsCount
+      milestone {
+        id
+        description
+        releases {
+          pageInfo {
+            endCursor
+            hasNextPage
+            hasPreviousPage
+            startCursor
+          }
+          nodes {
+            author {
+              avatarUrl
+              id
+              bot
+              username
+              userPermissions {
+                createSnippet
+              }
+            }
+          }
+        }
+
+      }
+      moved
+      projectId
+      reference(full: false)
+      relativePosition
+      severity
+      slaDueAt
+      state
+      statusPagePublishedIncident
+      subscribed
+      taskCompletionStatus {
+        completedCount
+        count
+      }
+      timeEstimate
+      title
+      titleHtml
+      totalTimeSpent
+      type
+      updatedAt
+      updatedBy {
+        avatarUrl
+      }
+      upvotes
+      userDiscussionsCount
+      userNotesCount
+      webPath
+      webUrl
+      weight
+    }
+    pageInfo {
+      endCursor
+      hasNextPage
+      hasPreviousPage
+      startCursor
+    }
+  }
+}

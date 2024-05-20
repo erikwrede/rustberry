@@ -1,6 +1,6 @@
 import timeit
 import time
-from graphql import execute, GraphQLObjectType, GraphQLSchema, GraphQLField, GraphQLString, GraphQLList
+from graphql import execute, GraphQLObjectType, GraphQLSchema, GraphQLField, GraphQLString, GraphQLList, validate
 
 from rustberry import QueryCompiler
 
@@ -42,6 +42,13 @@ class QueryType(GraphQLObjectType):
             name='Query',
             fields={
                 'hello': GraphQLField(GraphQLString, resolve=Query.resolve_hello),
+                'hellob': GraphQLField(GraphQLString, resolve=Query.resolve_hello),
+                'helloc': GraphQLField(GraphQLString, resolve=Query.resolve_hello),
+                'hellod': GraphQLField(GraphQLString, resolve=Query.resolve_hello),
+                'helloe': GraphQLField(GraphQLString, resolve=Query.resolve_hello),
+                'hellof': GraphQLField(GraphQLString, resolve=Query.resolve_hello),
+                'hellog': GraphQLField(GraphQLString, resolve=Query.resolve_hello),
+                'helloh': GraphQLField(GraphQLString, resolve=Query.resolve_hello),
                 'greeting': GraphQLField(GraphQLString, resolve=Query.resolve_greeting),
                 'fruits': GraphQLField(GraphQLList(FruitType()), resolve=Query.resolve_fruits)
             }
@@ -49,39 +56,41 @@ class QueryType(GraphQLObjectType):
 
 
 schema = GraphQLSchema(query=QueryType())
-
 from graphql import validate_schema
 
 validate_schema(schema)
-operation = """
+operation2 = """
         { hello, greeting, fruits { name } }
         """
+operation = """
+        { hello,hellob,helloc,hellod,helloe,hellof,hellog,helloh,b:hello,c:hello,d:hello greeting, fruits { name } }
+        """
 
-from graphql.language.printer import print_ast
 from graphql.utilities import get_introspection_query, build_client_schema
-from graphql import parse, print_schema, validate, ExecutionResult
+from graphql import parse, print_schema
+from graphql.language.printer import print_ast
 
-introspection_result = execute(schema, parse(get_introspection_query(True,True,True,True,True)))
+introspection_result = execute(schema, parse(get_introspection_query(True, True, True, True, True)))
 schema_ast = introspection_result.data
 schema_str = print_schema(build_client_schema(schema_ast))
 
 print(schema_str)
-compiler = QueryCompiler()
-compiler.set_schema(schema_str)
-
+compiler = QueryCompiler(schema_str)
 
 def validate_timing():
     query = parse(operation)
     validation_errors = validate(schema, query)
+    # validation_success = not validation_errors
+    print("printing ast")
+    print(print_ast(query))
 
-    if validation_errors:
-        return ExecutionResult(data=None, errors=validation_errors)
+    # if not validation_success:
+    #    return ExecutionResult(data=None, errors=validation_errors)
 
-
-
-    e =  execute(
+    e = execute(
         schema, query,
     )
+    return e
 
 
 # num = 100
@@ -102,6 +111,7 @@ def run_benchmarks(func, warmup_time=0.1):
     # Print the results
     print(f"Time taken: {time_taken:.6f} seconds")
 
-# Example usage: benchmarking the built-in sum function
 
-run_benchmarks(validate_timing, 1)
+# Example usage: benchmarking the built-in sum function
+print(validate_timing())
+#run_benchmarks(validate_timing, 1)
