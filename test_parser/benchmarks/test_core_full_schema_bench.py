@@ -194,7 +194,6 @@ def test_pycon_query_execution_graphql_core():
     e = execute(
         schema, query,
     )
-    return
 
 
 @pytest.mark.benchmark
@@ -208,4 +207,14 @@ def test_pycon_query_execution_rustberry():
     e = execute(
         schema, query,
     )
-    return
+
+@pytest.mark.benchmark
+def test_pure_execution_core(benchmark):
+    query = parse(operation)
+    benchmark(execute, schema, query)
+
+@pytest.mark.benchmark
+def test_pure_execution_rustberry(benchmark):
+    document = compiler.parse(operation)
+    query = compiler.gql_core_ast_mirror(document)
+    benchmark(execute, schema, query)
