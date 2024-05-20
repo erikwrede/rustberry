@@ -28,12 +28,13 @@ jobs:
           poetry run maturin build --release --out dist
           pip install --no-index --find-links=dist/ rustberry
       - name: Setup Benchmarks
-        run: |
-          cd test_parser
+        working-directory: test_parser
+        run:
           poetry export --with test --with dev --without-hashes --without local --output requirements.txt
           pip install -r requirements.txt
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v2
+        working-directory: test_parser
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: pytest benchmarks --codspeed
