@@ -170,6 +170,71 @@ query ConferenceQuery {
 } 	
 
 """
+operation_large = """
+query ConferenceQuery {
+	a: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	b: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	c: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	d: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}	
+} 	
+
+"""
 from graphql.utilities import get_introspection_query, build_client_schema
 from graphql import parse, print_schema
 
@@ -182,12 +247,12 @@ compiler = QueryCompiler(schema_str)
 
 
 def validate_timing():
-    query = parse(operation3)
-    validation_errors = validate(schema, query)
+    #query = parse(operation_large)
+    #validation_errors = validate(schema, query)
     # validation_success = not validation_errors
-    #query = compiler.parse(operation3)
-    #validation_success = compiler.validate(query)
-    #query = compiler.gql_core_ast_mirror(query)
+    query = compiler.parse(operation_large)
+    validation_success = compiler.validate(query)
+    query = compiler.gql_core_ast_mirror(query)
     # if not validation_success:
     #    return ExecutionResult(data=None, errors=validation_errors)
 
@@ -217,5 +282,5 @@ def run_benchmarks(func, warmup_time=0.1):
 
 
 # Example usage: benchmarking the built-in sum function
-print(validate_timing())
-#run_benchmarks(validate_timing, 1)
+#print(validate_timing())
+run_benchmarks(validate_timing, 1)

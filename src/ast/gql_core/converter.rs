@@ -11,7 +11,7 @@ struct CoreOperationType {
 }
 
 impl CoreOperationType {
-    fn new(PyOperationType: &PyAny) -> CoreOperationType {
+    fn new(PyOperationType: Bound<PyAny>) -> CoreOperationType {
         let query = PyOperationType.getattr("QUERY").unwrap();
         let mutation = PyOperationType.getattr("MUTATION").unwrap();
         let subscription = PyOperationType.getattr("SUBSCRIPTION").unwrap();
@@ -41,11 +41,12 @@ pub struct CoreConversionContext {
     field_node: Py<PyAny>,
     document_node: Py<PyAny>,
     name_node: Py<PyAny>,
+
 }
 
 impl CoreConversionContext {
     pub fn new(py: Python) -> Self {
-        let graphql_core_ast = PyModule::import(py, "graphql.language.ast").unwrap();
+        let graphql_core_ast = PyModule::import_bound(py, "graphql.language.ast").unwrap();
         let PyDocumentNode = graphql_core_ast.getattr("DocumentNode").unwrap();
         let PyOperationType = graphql_core_ast.getattr("OperationType").unwrap();
         let PyOperationDefinitionNode = graphql_core_ast.getattr("OperationDefinitionNode").unwrap();
@@ -63,18 +64,18 @@ impl CoreConversionContext {
         }
     }
 
-    fn get_name_nome(&self, py: Python, name: &str) -> PyResult<PyObject> {
-        let name_node_kwargs = PyDict::new(py);
+    fn get_name_node(&self, py: Python, name: &str) -> PyResult<PyObject> {
+        let name_node_kwargs = PyDict::new_bound(py);
 
-        let name = PyString::new(py, name);
+        let name = PyString::new_bound(py, name);
         name_node_kwargs.set_item("value", name)?;
 
-        self.name_node.call(py, (), Some(name_node_kwargs))
+        self.name_node.call_bound(py, (), Some(&name_node_kwargs))
     }
 
     fn convert_field_to_core_field(&self, py: Python, field: &Node<Field>) -> PyResult<PyObject> {
         //println!("Converting field to core field...");
-        let field_node_kwargs = PyDict::new(py);
+        let field_node_kwargs = PyDict::new_bound(py);
         if field.selection_set.selections.len() > 0 {
             //println!("Field has selection set");
             let selection_set = self.convert_selection_set_to_core_selection_set(py, &field.selection_set)?;
@@ -84,18 +85,18 @@ impl CoreConversionContext {
 
         //println!("Alias");
         if let Some(alias) = &field.alias {
-            field_node_kwargs.set_item("alias", PyString::new(py, alias.as_str()))?;
+            field_node_kwargs.set_item("alias", PyString::new_bound(py, alias.as_str()))?;
         }
 
         //println!("Name");
-        let name = self.get_name_nome(py, field.name.as_str())?;
+        let name = self.get_name_node(py, field.name.as_str())?;
         field_node_kwargs.set_item("name", name)?;
 
         //println!("Initing lists");
 
         // init an empty list of pyobjects
-        let arguments = PyList::empty(py).to_object(py);
-        let directives = PyList::empty(py).to_object(py);
+        let arguments = PyList::empty_bound(py).to_object(py);
+        let directives = PyList::empty_bound(py).to_object(py);
 
 
         field_node_kwargs.set_item("arguments", arguments)?;
@@ -104,14 +105,14 @@ impl CoreConversionContext {
 
         //println!("Calling field constructor");
 
-        self.field_node.call(py, (), Some(field_node_kwargs))
+        self.field_node.call_bound(py, (), Some(&field_node_kwargs))
     }
 
     fn convert_selection_set_to_core_selection_set(&self, py: Python, selection_set: &SelectionSet) -> PyResult<PyObject> {
         //println!("Converting selection set...");
-        let selection_set_kwargs = PyDict::new(py);
+        let selection_set_kwargs = PyDict::new_bound(py);
         // FIXME do we NEED to use PyTuple here?
-        let selections = PyList::empty(py);
+        let selections = PyList::empty_bound(py);
 
         for selection in &selection_set.selections {
             let core_selection = match selection {
@@ -127,20 +128,20 @@ impl CoreConversionContext {
         //println!("Done converting selections!");
         selection_set_kwargs.set_item("selections", selections)?;
         //println!("Appended selections to kwargs!");
-        self.selection_set_node.call(py, (), Some(selection_set_kwargs))
+        self.selection_set_node.call_bound(py, (), Some(&selection_set_kwargs))
     }
 
     pub fn convert_core_to_core_ast(self: &Self, py: Python, document: &ExecutableDocument) -> PyResult<PyObject> {
         let operations = document.all_operations();
         let fragments = &document.fragments;
 
-        let core_operations = PyList::empty(py);
+        let core_operations = PyList::empty_bound(py);
 
         for operation in operations {
-            let operation_kwargs = PyDict::new(py);
+            let operation_kwargs = PyDict::new_bound(py);
 
             if let Some(operation_name) = &operation.name{
-                let operation_name = self.get_name_nome(py, operation_name)?;
+                let operation_name = self.get_name_node(py, operation_name)?;
                 // FIXME is this necessary?
                 //println!("Trying to set name!");
                 operation_kwargs.set_item("name", operation_name)?;
@@ -162,21 +163,21 @@ impl CoreConversionContext {
 
             //println!("Selection sett, directives, variables done!");
 
-            operation_kwargs.set_item("operation", operation_type.into_ref(py))?;
+            operation_kwargs.set_item("operation", operation_type.into_bound(py))?;
 
             //println!("Operation type set kwarg!");
             operation_kwargs.set_item("selection_set", self.convert_selection_set_to_core_selection_set(py, selection_set)?)?;
             //println!("Selection Set converted!");
 
             //println!("Creating Operation def node...");
-            core_operations.append(self.operation_definition.call(py, (), Some(operation_kwargs))?)?;
+            core_operations.append(self.operation_definition.call_bound(py, (), Some(&operation_kwargs))?)?;
 
             //println!("Created Operation def node!");
         }
-        let document_node_kwargs = PyDict::new(py);
+        let document_node_kwargs = PyDict::new_bound(py);
         document_node_kwargs.set_item("definitions", core_operations)?;
 
         //println!("Creating document node!");
-        self.document_node.call(py, (), Some(document_node_kwargs))
+        self.document_node.call_bound(py, (), Some(&document_node_kwargs))
     }
 }

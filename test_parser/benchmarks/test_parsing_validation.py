@@ -25,3 +25,8 @@ def test_validation_gitlab_query_rustberry():
     document = compiler.parse(operation)
     validation_success = compiler.validate(document)
     query = compiler.gql_core_ast_mirror(document)
+@pytest.mark.benchmark
+def test_validation_gitlab_query_rustberry_no_mirror():
+    document = compiler.parse(operation)
+    validation_success = compiler.validate(document)
+    query = compiler.gql_core_ast(document)
