@@ -1,6 +1,7 @@
 import pytest
 from graphql import execute, GraphQLObjectType, GraphQLArgument, GraphQLSchema, GraphQLField, GraphQLString, \
     GraphQLList, validate, ExecutionResult
+from graphql.language.printer import print_ast
 
 from rustberry import QueryCompiler
 
@@ -170,6 +171,376 @@ query ConferenceQuery {
 } 	
 
 """
+operation_large = """
+query ConferenceQuery {
+	a: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	b: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	c: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	d: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}	
+} 	
+"""
+
+operation_xxlarge = """
+query ConferenceQuery {
+	a: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	b: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	c: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	d: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}	
+	e: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	f: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	g: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	h: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	i: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	j: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	k: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	l: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	m: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	n: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	o: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	p: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	q: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	r: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	s: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+	t: conference(id: "pycon-it-2024") {
+	name
+	description	
+	talks {
+		title
+		speaker {
+			name
+			github
+		}
+	}
+	faqs {
+		question
+		answer
+	}
+	}
+}
+"""
+
 
 from graphql.utilities import get_introspection_query, build_client_schema
 from graphql import parse, print_schema
@@ -183,7 +554,7 @@ compiler = QueryCompiler(schema_str)
 
 
 @pytest.mark.benchmark
-def test_pycon_query_execution_graphql_core():
+def test_full__graphql_core():
     query = parse(operation)
     validation_errors = validate(schema, query)
     validation_success = not validation_errors
@@ -194,11 +565,10 @@ def test_pycon_query_execution_graphql_core():
     e = execute(
         schema, query,
     )
-    return
 
 
 @pytest.mark.benchmark
-def test_pycon_query_execution_rustberry():
+def test_full__rustberry():
     document = compiler.parse(operation)
     validation_success = compiler.validate(document)
     query = compiler.gql_core_ast_mirror(document)
@@ -208,4 +578,125 @@ def test_pycon_query_execution_rustberry():
     e = execute(
         schema, query,
     )
-    return
+@pytest.mark.benchmark
+def test_full__rustberry_no_mirror():
+    document = compiler.parse(operation)
+    validation_success = compiler.validate(document)
+    query = compiler.gql_core_ast(document)
+    if not validation_success:
+        return ExecutionResult(data=None, errors=validation_errors)
+
+    e = execute(
+        schema, query,
+    )
+
+
+@pytest.mark.benchmark
+def test_full_large__graphql_core():
+    query = parse(operation_large)
+    validation_errors = validate(schema, query)
+    validation_success = not validation_errors
+
+    if not validation_success:
+        return ExecutionResult(data=None, errors=validation_errors)
+
+    e = execute(
+        schema, query,
+    )
+
+@pytest.mark.benchmark
+def test_full_large__rustberry():
+    document = compiler.parse(operation_large)
+    validation_success = compiler.validate(document)
+    query = compiler.gql_core_ast_mirror(document)
+    if not validation_success:
+        return ExecutionResult(data=None, errors=validation_errors)
+
+    e = execute(
+        schema, query,
+    )
+
+@pytest.mark.benchmark
+def test_full_large__rustberry_no_mirror():
+    document = compiler.parse(operation_large)
+    validation_success = compiler.validate(document)
+    query = compiler.gql_core_ast(document)
+    if not validation_success:
+        return ExecutionResult(data=None, errors=validation_errors)
+
+    e = execute(
+        schema, query,
+    )
+
+@pytest.mark.benchmark
+def test_full_xlarge__graphql_core():
+    query = parse(operation_xxlarge)
+    validation_errors = validate(schema, query)
+    validation_success = not validation_errors
+
+    if not validation_success:
+        return ExecutionResult(data=None, errors=validation_errors)
+
+    e = execute(
+        schema, query,
+    )
+
+@pytest.mark.benchmark
+def test_full_xxlarge__rustberry():
+    document = compiler.parse(operation_xxlarge)
+    validation_success = compiler.validate(document)
+    query = compiler.gql_core_ast_mirror(document)
+    if not validation_success:
+        return ExecutionResult(data=None, errors=validation_errors)
+
+    e = execute(
+        schema, query,
+    )
+
+@pytest.mark.benchmark
+def test_full_xxlarge__rustberry_no_mirror():
+    document = compiler.parse(operation_xxlarge)
+    validation_success = compiler.validate(document)
+    query = compiler.gql_core_ast(document)
+    if not validation_success:
+        return ExecutionResult(data=None, errors=validation_errors)
+
+    e = execute(
+        schema, query,
+    )
+
+@pytest.mark.benchmark
+def test_pure_execution_core(benchmark):
+    query = parse(operation)
+    benchmark(execute, schema, query)
+
+@pytest.mark.benchmark
+def test_pure_execution__rustberry(benchmark):
+    document = compiler.parse(operation)
+    query = compiler.gql_core_ast_mirror(document)
+    benchmark(execute, schema, query)
+@pytest.mark.benchmark
+def test_pure_execution__rustberry_no_mirror(benchmark):
+    document = compiler.parse(operation)
+    query = compiler.gql_core_ast(document)
+    benchmark(execute, schema, query)
+
+
+
+@pytest.mark.benchmark
+def test_pure_execution_core_large(benchmark):
+    query = parse(operation_large)
+    benchmark(execute, schema, query)
+
+@pytest.mark.benchmark
+def test_pure_execution_large__rustberry(benchmark):
+    document = compiler.parse(operation_large)
+    query = compiler.gql_core_ast_mirror(document)
+    benchmark(execute, schema, query)
+
+@pytest.mark.benchmark
+def test_pure_execution_large__rustberry_no_mirror(benchmark):
+    document = compiler.parse(operation_large)
+    query = compiler.gql_core_ast(document)
+    #print(print_ast(query))
+    benchmark(execute, schema, query)

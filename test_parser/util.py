@@ -1,9 +1,6 @@
-import os
-
-
 def get_sdl_str() -> str:
     """Return the SDL string for the test schema."""
-    # read file graphql.schema
+    # read file schema.graphql
 
     with open('graphql.schema') as f:
         return f.read()
@@ -36,19 +33,19 @@ type Cat implements Pet {
     with open('graphql.schema') as f:
         return f.read()
 
+
 def get_query_str() -> str:
     """Return the query string for the test query."""
     # read file graphql.query
-    with open('query.gql') as f:
+    with open('benchmarks/gql/gitlab/query.gql') as f:
         return f.read()
-    return"""
-query DEF{
+    return """
+query DEF(a: String!, b: String!, b: String){
   name
   cat {
     name
   }
 }
 """
-    with open('query.gql') as f:
+    with open('benchmarks/gql/gitlab/query.gql') as f:
         return f.read()
-
