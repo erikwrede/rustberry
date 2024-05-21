@@ -250,7 +250,7 @@ compiler = QueryCompiler(schema_str)
 
 
 @pytest.mark.benchmark
-def test_pycon_query_execution_graphql_core():
+def test_full_graphql_core():
     query = parse(operation)
     validation_errors = validate(schema, query)
     validation_success = not validation_errors
@@ -264,7 +264,7 @@ def test_pycon_query_execution_graphql_core():
 
 
 @pytest.mark.benchmark
-def test_pycon_query_execution_rustberry():
+def test_full_rustberry():
     document = compiler.parse(operation)
     validation_success = compiler.validate(document)
     query = compiler.gql_core_ast_mirror(document)
@@ -275,10 +275,48 @@ def test_pycon_query_execution_rustberry():
         schema, query,
     )
 @pytest.mark.benchmark
-def test_pycon_query_execution_rustberry_no_mirror():
+def test_full_rustberry_no_mirror():
     document = compiler.parse(operation)
     validation_success = compiler.validate(document)
+    query = compiler.gql_core_ast(document)
+    if not validation_success:
+        return ExecutionResult(data=None, errors=validation_errors)
+
+    e = execute(
+        schema, query,
+    )
+
+
+@pytest.mark.benchmark
+def test_full_large_graphql_core():
+    query = parse(operation_large)
+    validation_errors = validate(schema, query)
+    validation_success = not validation_errors
+
+    if not validation_success:
+        return ExecutionResult(data=None, errors=validation_errors)
+
+    e = execute(
+        schema, query,
+    )
+
+@pytest.mark.benchmark
+def test_full_large_rustberry():
+    document = compiler.parse(operation_large)
+    validation_success = compiler.validate(document)
     query = compiler.gql_core_ast_mirror(document)
+    if not validation_success:
+        return ExecutionResult(data=None, errors=validation_errors)
+
+    e = execute(
+        schema, query,
+    )
+
+@pytest.mark.benchmark
+def test_full_large_rustberry_no_mirror():
+    document = compiler.parse(operation_large)
+    validation_success = compiler.validate(document)
+    query = compiler.gql_core_ast(document)
     if not validation_success:
         return ExecutionResult(data=None, errors=validation_errors)
 
@@ -310,13 +348,13 @@ def test_pure_execution_core_large(benchmark):
     benchmark(execute, schema, query)
 
 @pytest.mark.benchmark
-def test_pure_execution_rustberry_large(benchmark):
+def test_pure_execution_large_rustberry(benchmark):
     document = compiler.parse(operation_large)
     query = compiler.gql_core_ast_mirror(document)
     benchmark(execute, schema, query)
 
 @pytest.mark.benchmark
-def test_pure_execution_rustberry_large_no_mirrpr(benchmark):
+def test_pure_execution_large_rustberry_no_mirror(benchmark):
     document = compiler.parse(operation_large)
     query = compiler.gql_core_ast(document)
     #print(print_ast(query))
