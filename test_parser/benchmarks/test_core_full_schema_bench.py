@@ -1,6 +1,7 @@
 import pytest
 from graphql import execute, GraphQLObjectType, GraphQLArgument, GraphQLSchema, GraphQLField, GraphQLString, \
     GraphQLList, validate, ExecutionResult
+from graphql.language.printer import print_ast
 
 from rustberry import QueryCompiler
 
@@ -273,6 +274,17 @@ def test_pycon_query_execution_rustberry():
     e = execute(
         schema, query,
     )
+@pytest.mark.benchmark
+def test_pycon_query_execution_rustberry_no_mirror():
+    document = compiler.parse(operation)
+    validation_success = compiler.validate(document)
+    query = compiler.gql_core_ast_mirror(document)
+    if not validation_success:
+        return ExecutionResult(data=None, errors=validation_errors)
+
+    e = execute(
+        schema, query,
+    )
 
 @pytest.mark.benchmark
 def test_pure_execution_core(benchmark):
@@ -283,6 +295,11 @@ def test_pure_execution_core(benchmark):
 def test_pure_execution_rustberry(benchmark):
     document = compiler.parse(operation)
     query = compiler.gql_core_ast_mirror(document)
+    benchmark(execute, schema, query)
+@pytest.mark.benchmark
+def test_pure_execution_rustberry_no_mirror(benchmark):
+    document = compiler.parse(operation)
+    query = compiler.gql_core_ast(document)
     benchmark(execute, schema, query)
 
 
@@ -296,4 +313,11 @@ def test_pure_execution_core_large(benchmark):
 def test_pure_execution_rustberry_large(benchmark):
     document = compiler.parse(operation_large)
     query = compiler.gql_core_ast_mirror(document)
+    benchmark(execute, schema, query)
+
+@pytest.mark.benchmark
+def test_pure_execution_rustberry_large_no_mirrpr(benchmark):
+    document = compiler.parse(operation_large)
+    query = compiler.gql_core_ast(document)
+    #print(print_ast(query))
     benchmark(execute, schema, query)
