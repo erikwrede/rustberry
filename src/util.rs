@@ -4,7 +4,7 @@
 
 use pyo3::ffi::Py_ssize_t;
 use pyo3::prelude::*;
-use pyo3::types::{PyAnyMethods, PyTuple};
+use pyo3::types::PyTuple;
 use pyo3::{ffi, Py};
 
 /// Convenience alias for an owned reference to any Python object.

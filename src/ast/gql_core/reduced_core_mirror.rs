@@ -37,14 +37,14 @@ fn cached_class<'py>(
     let cls: Py<PyType> = py
         .import("graphql.language.ast")?
         .getattr(name)?
-        .downcast_into::<PyType>()
+        .cast_into::<PyType>()
         .map_err(PyErr::from)?
         .unbind();
     let _ = slot.set(cls.clone_ref(py));
     Ok(cls)
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct NameNode {
     #[pyo3(get)]
@@ -65,7 +65,7 @@ impl NameNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct DocumentNode {
     #[pyo3(get)]
@@ -86,7 +86,7 @@ impl DocumentNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct OperationDefinitionNode {
     #[pyo3(get)]
@@ -115,7 +115,7 @@ impl OperationDefinitionNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct SelectionSetNode {
     #[pyo3(get)]
@@ -136,7 +136,7 @@ impl SelectionSetNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct FieldNode {
     #[pyo3(get)]
@@ -165,7 +165,7 @@ impl FieldNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct DirectiveNode {
     #[pyo3(get)]
@@ -188,7 +188,7 @@ impl DirectiveNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct ArgumentNode {
     #[pyo3(get)]
@@ -212,7 +212,7 @@ impl ArgumentNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct VariableDefinitionNode {
     #[pyo3(get)]
@@ -242,7 +242,7 @@ impl VariableDefinitionNode {
 }
 
 //#region: TypeNode
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct NamedTypeNode {
     #[pyo3(get)]
@@ -263,7 +263,7 @@ impl NamedTypeNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct ListTypeNode {
     /// One of the `*TypeNode` variants.
@@ -285,7 +285,7 @@ impl ListTypeNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct NonNullTypeNode {
     /// `NamedTypeNode` or `ListTypeNode`.
@@ -309,7 +309,7 @@ impl NonNullTypeNode {
 //#endregion: TypeNode
 
 //#region: ValueNode
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct VariableNode {
     #[pyo3(get)]
@@ -330,7 +330,7 @@ impl VariableNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct IntValueNode {
     #[pyo3(get)]
@@ -351,7 +351,7 @@ impl IntValueNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct FloatValueNode {
     #[pyo3(get)]
@@ -372,7 +372,7 @@ impl FloatValueNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct StringValueNode {
     #[pyo3(get)]
@@ -395,7 +395,7 @@ impl StringValueNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct BooleanValueNode {
     #[pyo3(get)]
@@ -416,7 +416,7 @@ impl BooleanValueNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct NullValueNode {}
 
@@ -434,7 +434,7 @@ impl NullValueNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct EnumValueNode {
     #[pyo3(get)]
@@ -455,7 +455,7 @@ impl EnumValueNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct ListValueNode {
     /// `Vec` of `*ValueNode` variants.
@@ -477,7 +477,7 @@ impl ListValueNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct ObjectFieldNode {
     #[pyo3(get)]
@@ -501,7 +501,7 @@ impl ObjectFieldNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct ObjectValueNode {
     #[pyo3(get)]
@@ -524,7 +524,7 @@ impl ObjectValueNode {
 //#endregion: ValueNode
 
 //#region: Fragments
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct FragmentSpreadNode {
     #[pyo3(get)]
@@ -547,7 +547,7 @@ impl FragmentSpreadNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct InlineFragmentNode {
     #[pyo3(get)]
@@ -572,7 +572,7 @@ impl InlineFragmentNode {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct FragmentDefinitionNode {
     #[pyo3(get)]

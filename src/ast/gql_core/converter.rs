@@ -51,7 +51,7 @@ impl CoreConversionContext {
         let downcast = |attr: &str| -> PyResult<Py<PyType>> {
             Ok(module
                 .getattr(attr)?
-                .downcast_into::<PyType>()
+                .cast_into::<PyType>()
                 .map_err(PyErr::from)?
                 .unbind())
         };

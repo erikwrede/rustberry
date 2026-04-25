@@ -20,13 +20,14 @@ fn cached<'py>(
     let cls: Py<PyType> = py
         .import(module)?
         .getattr(name)?
-        .downcast_into::<PyType>()
+        .cast_into::<PyType>()
         .map_err(PyErr::from)?
         .unbind();
     let _ = slot.set(cls.clone_ref(py));
     Ok(cls)
 }
 
+#[allow(dead_code)]
 pub fn import_field_node(py: Python<'_>) -> PyResult<Py<PyType>> {
     static CLS: OnceLock<Py<PyType>> = OnceLock::new();
     cached(py, &CLS, "graphql.language.ast", "FieldNode")

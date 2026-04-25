@@ -1,3 +1,5 @@
-from ._rustberry import QueryCompiler
+"""Public Python entry point for the rustberry extension module."""
 
-__all__ = ('QueryCompiler',)
+from ._rustberry import Document, GraphQLError, QueryCompiler, SourceLocation
+
+__all__ = ("Document", "GraphQLError", "QueryCompiler", "SourceLocation")
