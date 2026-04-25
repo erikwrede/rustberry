@@ -339,12 +339,20 @@ impl MirrorConversionContext {
         })
     }
 
+    /// Convert an apollo-compiler [`ExecutableDocument`] into a mirror
+    /// [`DocumentNode`].
+    ///
+    /// Both operation definitions and fragment definitions are appended to
+    /// the resulting `definitions` list (operations first, then fragments in
+    /// the order apollo-compiler reports them). Carrying fragment
+    /// definitions at the document top level is required for
+    /// `graphql-core`'s executor to resolve `...FragmentName` spreads.
     pub fn convert_core_to_core_ast(
         &self,
         py: Python<'_>,
         document: &ExecutableDocument,
     ) -> PyResult<DocumentNode> {
-        let mut definitions: Vec<Py<OperationDefinitionNode>> =
+        let mut definitions: Vec<PyObject> =
             Vec::with_capacity(document.operations.len() + document.fragments.len());
 
         for operation in document.operations.iter() {
@@ -368,22 +376,16 @@ impl MirrorConversionContext {
                 directives,
                 selection_set: Py::new(py, selection_set)?,
             };
-            definitions.push(Py::new(py, op_def)?);
+            definitions.push(Py::new(py, op_def)?.into_any());
         }
 
-        // Note: we don't yet attach fragment definitions to the document
-        // because the typed list above is `Vec<Py<OperationDefinitionNode>>`
-        // — that's a known limitation of the mirror tree, see
-        // `convert_fragment_definition` for the building block. For now,
-        // walking the document still observes fragment spreads via inline
-        // bodies in their referencing operation. A follow-up PR can widen
-        // `definitions` to a heterogeneous `Vec<PyObject>`.
-        let _ = (|| -> PyResult<()> {
-            for fragment in document.fragments.values() {
-                let _ = self.convert_fragment_definition(py, fragment)?;
-            }
-            Ok(())
-        })();
+        // Append fragment definitions after the operations. apollo-compiler
+        // exposes them as a name-keyed `IndexMap`, so iteration order
+        // mirrors the source document.
+        for fragment in document.fragments.values() {
+            let frag_def = self.convert_fragment_definition(py, fragment)?;
+            definitions.push(Py::new(py, frag_def)?.into_any());
+        }
 
         Ok(DocumentNode { definitions })
     }

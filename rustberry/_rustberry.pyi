@@ -21,6 +21,18 @@ class Document:
     """Opaque handle to a parsed apollo-compiler executable document."""
 
 
+class DocumentNode:
+    """Lightweight mirror of :class:`graphql.language.ast.DocumentNode`.
+
+    ``definitions`` is a heterogeneous list whose entries are either
+    operation-definition mirrors or fragment-definition mirrors — matching
+    the shape ``graphql-core``'s executor expects at the document root.
+    """
+
+    definitions: list[Any]
+    kind: str
+
+
 class QueryCompiler:
     """Persistent compiler bound to a single GraphQL schema."""
 
@@ -35,5 +47,5 @@ class QueryCompiler:
     def gql_core_ast(self, document: Document) -> Any:
         """Convert ``document`` into a tree of real ``graphql-core`` AST nodes."""
 
-    def gql_core_ast_mirror(self, document: Document) -> Any:
+    def gql_core_ast_mirror(self, document: Document) -> DocumentNode:
         """Convert ``document`` into a lightweight Rust-backed mirror AST."""

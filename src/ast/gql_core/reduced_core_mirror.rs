@@ -68,8 +68,13 @@ impl NameNode {
 #[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct DocumentNode {
+    /// Heterogeneous list of top-level definitions. Each entry is either an
+    /// [`OperationDefinitionNode`] or a [`FragmentDefinitionNode`] mirror —
+    /// `graphql-core`'s executor relies on fragment definitions appearing at
+    /// the document root to expand `...FragmentName` selections, so we keep
+    /// the Python-visible type wide enough to carry both.
     #[pyo3(get)]
-    pub definitions: Vec<Py<OperationDefinitionNode>>,
+    pub definitions: Vec<PyObject>,
 }
 
 #[pymethods]
