@@ -12,6 +12,7 @@ use apollo_compiler::executable::{
 use apollo_compiler::schema::{Directive, Type, Value};
 use apollo_compiler::{ExecutableDocument, Node};
 use pyo3::prelude::*;
+use pyo3::types::PyString;
 
 use crate::ast::gql_core::reduced_core_mirror::*;
 
@@ -61,15 +62,27 @@ impl MirrorConversionContext {
         })
     }
 
-    fn get_name_node(&self, name: &str) -> NameNode {
+    /// Build a [`NameNode`] with the textual value pre-interned in the
+    /// Python string pool. Interning matches `graphql-core`'s convention
+    /// for AST names (where `Name.value` is used as a dict key) and lets
+    /// later `==` comparisons short-circuit on pointer identity.
+    fn get_name_node(&self, py: Python<'_>, name: &str) -> NameNode {
         NameNode {
-            value: name.to_string(),
+            value: PyString::intern(py, name).unbind(),
         }
+    }
+
+    /// Convert a Rust string to an interned `Py<PyString>`. Used for
+    /// `*ValueNode.value` fields whose textual representations come from
+    /// apollo-compiler.
+    #[inline]
+    fn intern_str(py: Python<'_>, s: &str) -> Py<PyString> {
+        PyString::intern(py, s).unbind()
     }
 
     fn convert_argument(&self, py: Python<'_>, argument: &Node<Argument>) -> ArgumentNode {
         ArgumentNode {
-            name: self.get_name_node(argument.name.as_str()),
+            name: self.get_name_node(py, argument.name.as_str()),
             value: self.convert_value(py, &argument.value),
         }
     }
@@ -85,7 +98,7 @@ impl MirrorConversionContext {
         let alias = field
             .alias
             .as_ref()
-            .map(|alias| self.get_name_node(alias.as_str()));
+            .map(|alias| self.get_name_node(py, alias.as_str()));
 
         let arguments = field
             .arguments
@@ -101,7 +114,7 @@ impl MirrorConversionContext {
 
         Ok(FieldNode {
             alias,
-            name: self.get_name_node(field.name.as_str()),
+            name: self.get_name_node(py, field.name.as_str()),
             arguments,
             directives,
             selection_set,
@@ -114,7 +127,7 @@ impl MirrorConversionContext {
         spread: &apollo_compiler::executable::FragmentSpread,
     ) -> FragmentSpreadNode {
         FragmentSpreadNode {
-            name: self.get_name_node(spread.fragment_name.as_str()),
+            name: self.get_name_node(py, spread.fragment_name.as_str()),
             directives: spread
                 .directives
                 .iter()
@@ -134,7 +147,7 @@ impl MirrorConversionContext {
                 .type_condition
                 .as_ref()
                 .map(|t| NamedTypeNode {
-                    name: self.get_name_node(t.as_str()),
+                    name: self.get_name_node(py, t.as_str()),
                 }),
             directives: inline
                 .directives
@@ -176,7 +189,7 @@ impl MirrorConversionContext {
             Type::Named(named_type) => Py::new(
                 py,
                 NamedTypeNode {
-                    name: self.get_name_node(named_type.as_str()),
+                    name: self.get_name_node(py, named_type.as_str()),
                 },
             )?
             .into_any(),
@@ -184,7 +197,7 @@ impl MirrorConversionContext {
                 let inner = Py::new(
                     py,
                     NamedTypeNode {
-                        name: self.get_name_node(named_type.as_str()),
+                        name: self.get_name_node(py, named_type.as_str()),
                     },
                 )?
                 .into_any();
@@ -209,21 +222,26 @@ impl MirrorConversionContext {
                 Value::Enum(name) => Py::new(
                     py,
                     EnumValueNode {
-                        value: name.to_string(),
+                        value: Self::intern_str(py, name.as_str()),
                     },
                 )?
                 .into_any(),
                 Value::Variable(name) => Py::new(
                     py,
                     VariableNode {
-                        name: self.get_name_node(name.as_str()),
+                        name: self.get_name_node(py, name.as_str()),
                     },
                 )?
                 .into_any(),
                 Value::String(string) => Py::new(
                     py,
                     StringValueNode {
-                        value: string.to_string(),
+                        // String literals are typically not interned in
+                        // Python (they can be arbitrarily long), but using
+                        // [`PyString::new`] keeps the conversion-once
+                        // contract intact: the getter returns a refcount
+                        // clone instead of re-encoding UTF-8 each time.
+                        value: PyString::new(py, string).unbind(),
                         // apollo-compiler doesn't track whether the
                         // original literal was a block string; default to
                         // `None` to match graphql-core's optional flag.
@@ -234,14 +252,14 @@ impl MirrorConversionContext {
                 Value::Float(float) => Py::new(
                     py,
                     FloatValueNode {
-                        value: float.to_string(),
+                        value: Self::intern_str(py, &float.to_string()),
                     },
                 )?
                 .into_any(),
                 Value::Int(int) => Py::new(
                     py,
                     IntValueNode {
-                        value: int.to_string(),
+                        value: Self::intern_str(py, &int.to_string()),
                     },
                 )?
                 .into_any(),
@@ -261,7 +279,7 @@ impl MirrorConversionContext {
                     let core_fields: Vec<ObjectFieldNode> = fields
                         .iter()
                         .map(|(name, value)| ObjectFieldNode {
-                            name: self.get_name_node(name.as_str()),
+                            name: self.get_name_node(py, name.as_str()),
                             value: self.convert_value(py, value),
                         })
                         .collect();
@@ -279,7 +297,7 @@ impl MirrorConversionContext {
 
     fn convert_directive(&self, py: Python<'_>, directive: &Node<Directive>) -> DirectiveNode {
         DirectiveNode {
-            name: self.get_name_node(directive.name.as_str()),
+            name: self.get_name_node(py, directive.name.as_str()),
             arguments: directive
                 .arguments
                 .iter()
@@ -298,7 +316,7 @@ impl MirrorConversionContext {
             .map(|variable| {
                 Ok(VariableDefinitionNode {
                     variable: VariableNode {
-                        name: self.get_name_node(variable.name.as_str()),
+                        name: self.get_name_node(py, variable.name.as_str()),
                     },
                     default_value: variable
                         .default_value
@@ -322,9 +340,9 @@ impl MirrorConversionContext {
     ) -> PyResult<FragmentDefinitionNode> {
         let selection_set = self.convert_selection_set(py, &fragment.selection_set)?;
         Ok(FragmentDefinitionNode {
-            name: self.get_name_node(fragment.name.as_str()),
+            name: self.get_name_node(py, fragment.name.as_str()),
             type_condition: NamedTypeNode {
-                name: self.get_name_node(fragment.selection_set.ty.as_str()),
+                name: self.get_name_node(py, fragment.selection_set.ty.as_str()),
             },
             directives: fragment
                 .directives
@@ -371,7 +389,7 @@ impl MirrorConversionContext {
                 name: operation
                     .name
                     .as_ref()
-                    .map(|name| self.get_name_node(name.as_str())),
+                    .map(|name| self.get_name_node(py, name.as_str())),
                 variable_definitions,
                 directives,
                 selection_set: Py::new(py, selection_set)?,
