@@ -38,11 +38,15 @@ pub struct QueryCompiler {
 
 /// Format an apollo-compiler `WithErrors` value into a single human-readable
 /// string suitable for use as the message of a Python exception.
+///
+/// We deliberately render the JSON-shaped message (no ariadne snippet) so we
+/// don't get spurious "Unable to fetch source" lines on stderr when the
+/// schema source isn't part of the document's source map.
 fn format_with_errors<T>(errors: &apollo_compiler::validation::WithErrors<T>) -> String {
     errors
         .errors
         .iter()
-        .map(|d| d.to_string())
+        .map(|d| d.to_json().message)
         .collect::<Vec<_>>()
         .join("\n")
 }
