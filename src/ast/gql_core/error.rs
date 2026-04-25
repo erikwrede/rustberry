@@ -1,11 +1,18 @@
-use apollo_compiler::execution::{GraphQLError as ApolloGraphQLError, ResponseDataPathElement};
-use pyo3::{Py, PyAny, pyclass, pymethods, PyObject, PyResult, Python, ToPyObject};
-use pyo3::types::{PyInt, PyString};
+//! Python-facing GraphQL error type wrapping an apollo-compiler diagnostic.
+
+use apollo_compiler::response::{GraphQLError as ApolloGraphQLError, ResponseDataPathSegment};
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyString, PyType};
+
+type PyObject = Py<PyAny>;
 
 use crate::ast::gql_core::imports::import_graphql_error;
 use crate::ast::gql_core::location::SourceLocation;
 
-#[pyclass]
+/// Python equivalent of `graphql-core`'s `GraphQLError`, populated from an
+/// apollo-compiler diagnostic. Frozen because all data is captured at
+/// construction.
+#[pyclass(frozen)]
 pub struct GraphQLError {
     pub compiler_error: ApolloGraphQLError,
 }
@@ -13,9 +20,8 @@ pub struct GraphQLError {
 #[pymethods]
 impl GraphQLError {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = import_graphql_error(py)?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        import_graphql_error(py)
     }
 
     #[getter]
@@ -36,22 +42,39 @@ impl GraphQLError {
     }
 
     #[getter]
-    pub fn path(&self, py: Python<'_>) -> Vec<PyObject> {
+    pub fn path<'py>(&self, py: Python<'py>) -> PyResult<Vec<PyObject>> {
         self.compiler_error
             .path
             .iter()
             .map(|p| match p {
-                ResponseDataPathElement::Field(name) => {
-                    PyString::new_bound(py, name.as_str()).into()
+                ResponseDataPathSegment::Field(name) => {
+                    Ok(PyString::new(py, name.as_str()).into_any().unbind())
                 }
-                ResponseDataPathElement::ListIndex(index) => index.to_object(py),
+                ResponseDataPathSegment::ListIndex(index) => {
+                    Ok(index.into_pyobject(py)?.into_any().unbind())
+                }
             })
             .collect()
     }
 
+    /// Always returns `None` for now: apollo-compiler diagnostics do not
+    /// carry GraphQL response `extensions` data, so we expose a stable
+    /// `None` rather than panicking.
     #[getter]
-    pub fn extensions(&self) -> Option<&PyAny> {
-        // raise not supported error
-        panic!("Not supported yet")
+    pub fn extensions(&self, py: Python<'_>) -> PyResult<PyObject> {
+        // Mirror graphql-core's behaviour: extensions defaults to an empty
+        // dict if absent. Returning a fresh empty dict keeps consumers
+        // happy without leaking shared state.
+        Ok(PyDict::new(py).into_any().unbind())
+    }
+
+    /// String representation matches the underlying message — useful when
+    /// converting back to a Python `GraphQLError` exception.
+    fn __str__(&self) -> &str {
+        self.compiler_error.message.as_str()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("GraphQLError({:?})", self.compiler_error.message)
     }
 }

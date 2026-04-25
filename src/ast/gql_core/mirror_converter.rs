@@ -1,315 +1,390 @@
+//! Convert an apollo-compiler [`ExecutableDocument`] into the lightweight
+//! mirror node tree from [`super::reduced_core_mirror`]. This avoids per-node
+//! Python class construction overhead while still being indistinguishable
+//! to a `graphql-core` consumer thanks to the `__class__` and `kind`
+//! getters on each node.
+
 use std::ops::Deref;
 
-use apollo_compiler::{ExecutableDocument, Node};
-use apollo_compiler::executable::{Argument, Field, OperationType, Selection, SelectionSet};
+use apollo_compiler::executable::{
+    Argument, Field, Fragment, OperationType, Selection, SelectionSet,
+};
 use apollo_compiler::schema::{Directive, Type, Value};
-use pyo3::{PyAny, Python};
+use apollo_compiler::{ExecutableDocument, Node};
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 
 use crate::ast::gql_core::reduced_core_mirror::*;
 
+type PyObject = Py<PyAny>;
+
+/// Cached `OperationType` enum members from `graphql.language.ast`.
 struct CoreOperationType {
-    Query: Py<PyAny>,
-    Mutation: Py<PyAny>,
-    Subscription: Py<PyAny>,
+    query: PyObject,
+    mutation: PyObject,
+    subscription: PyObject,
 }
 
 impl CoreOperationType {
-    fn new(PyOperationType: &PyAny) -> CoreOperationType {
-        let query = PyOperationType.getattr("QUERY").unwrap();
-        let mutation = PyOperationType.getattr("MUTATION").unwrap();
-        let subscription = PyOperationType.getattr("SUBSCRIPTION").unwrap();
-
-        CoreOperationType {
-            Query: query.into(),
-            Mutation: mutation.into(),
-            Subscription: subscription.into(),
-        }
+    fn new(operation_type_cls: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Ok(Self {
+            query: operation_type_cls.getattr("QUERY")?.unbind(),
+            mutation: operation_type_cls.getattr("MUTATION")?.unbind(),
+            subscription: operation_type_cls.getattr("SUBSCRIPTION")?.unbind(),
+        })
     }
 
-    fn get_operation_type(&self, operation_type: OperationType) -> Py<PyAny> {
-        match operation_type {
-            OperationType::Query => self.Query.to_owned(),
-            OperationType::Mutation => self.Mutation.to_owned(),
-            OperationType::Subscription => self.Subscription.to_owned(),
+    fn get(&self, py: Python<'_>, op: OperationType) -> PyObject {
+        match op {
+            OperationType::Query => self.query.clone_ref(py),
+            OperationType::Mutation => self.mutation.clone_ref(py),
+            OperationType::Subscription => self.subscription.clone_ref(py),
         }
     }
 }
 
+/// Conversion context capable of turning an [`ExecutableDocument`] into a
+/// [`DocumentNode`] mirror tree.
+///
+/// The struct caches Python class references that the conversion routines
+/// need; create it once per [`crate::QueryCompiler`] and reuse for every
+/// document.
 pub struct MirrorConversionContext {
-    //graphql_core_ast: Py<PyModule>,
     operation_type: CoreOperationType,
-    operation_definition: Py<PyAny>,
-    selection_set_node: Py<PyAny>,
-    field_node: Py<PyAny>,
-    document_node: Py<PyAny>,
-    name_node: Py<PyAny>,
 }
 
 impl MirrorConversionContext {
-    pub fn new(py: Python) -> Self {
-        let graphql_core_ast = PyModule::import(py, "graphql.language.ast").unwrap();
-        let PyDocumentNode = graphql_core_ast.getattr("DocumentNode").unwrap();
-        let PyOperationType = graphql_core_ast.getattr("OperationType").unwrap();
-        let PyOperationDefinitionNode =
-            graphql_core_ast.getattr("OperationDefinitionNode").unwrap();
-        let PySelectionSetNode = graphql_core_ast.getattr("SelectionSetNode").unwrap();
-        let PyFieldNode = graphql_core_ast.getattr("FieldNode").unwrap();
-        let PyNameNode = graphql_core_ast.getattr("NameNode").unwrap();
-
-        Self {
-            operation_type: CoreOperationType::new(PyOperationType),
-            operation_definition: PyOperationDefinitionNode.into(),
-            selection_set_node: PySelectionSetNode.into(),
-            field_node: PyFieldNode.into(),
-            document_node: PyDocumentNode.into(),
-            name_node: PyNameNode.into(),
-        }
+    pub fn new(py: Python<'_>) -> PyResult<Self> {
+        let module = py.import("graphql.language.ast")?;
+        let operation_type_cls = module.getattr("OperationType")?;
+        Ok(Self {
+            operation_type: CoreOperationType::new(&operation_type_cls)?,
+        })
     }
 
-    fn get_name_node(&self, py: Python, name: &str) -> NameNode {
+    fn get_name_node(&self, name: &str) -> NameNode {
         NameNode {
             value: name.to_string(),
         }
     }
 
-    fn convert_argument_to_core_argument(&self, py: Python, argument: &Node<Argument>) -> ArgumentNode {
-        let name = self.get_name_node(py, argument.name.as_str());
-        let value = self.convert_value_to_core_value(py, &argument.value);
+    fn convert_argument(&self, py: Python<'_>, argument: &Node<Argument>) -> ArgumentNode {
         ArgumentNode {
-            name,
-            value,
+            name: self.get_name_node(argument.name.as_str()),
+            value: self.convert_value(py, &argument.value),
         }
     }
 
-    fn convert_field_to_core_field(&self, py: Python, field: &Node<Field>) -> FieldNode {
-        let selection_set = field.selection_set.selections.first()
-            .map(|_| self.convert_selection_set_to_core_selection_set(py, &field.selection_set));
+    fn convert_field(&self, py: Python<'_>, field: &Node<Field>) -> PyResult<FieldNode> {
+        let selection_set = if field.selection_set.selections.is_empty() {
+            None
+        } else {
+            let inner = self.convert_selection_set(py, &field.selection_set)?;
+            Some(Py::new(py, inner)?)
+        };
 
-        let alias = field.alias.as_ref().map(|field_alias| self.get_name_node(py, field_alias.as_str()));
+        let alias = field
+            .alias
+            .as_ref()
+            .map(|alias| self.get_name_node(alias.as_str()));
 
-        let name = self.get_name_node(py, field.name.as_str());
+        let arguments = field
+            .arguments
+            .iter()
+            .map(|argument| self.convert_argument(py, argument))
+            .collect();
 
-        let arguments = field.arguments.iter().map(|argument| {
-            self.convert_argument_to_core_argument(py, argument)
-        }).collect();
+        let directives = field
+            .directives
+            .iter()
+            .map(|directive| self.convert_directive(py, directive))
+            .collect();
 
-        let directives = field.directives.iter().map(|directive| {
-            self.convert_directive_to_core_directive(py, directive)
-        }).collect();
-
-        FieldNode {
+        Ok(FieldNode {
             alias,
-            name,
+            name: self.get_name_node(field.name.as_str()),
             arguments,
             directives,
             selection_set,
-        }
+        })
     }
 
-    fn convert_selection_set_to_core_selection_set(
+    fn convert_fragment_spread(
         &self,
-        py: Python,
-        selection_set: &SelectionSet,
-    ) -> SelectionSetNode {
-        //println!("Converting selection set...");
-        let selection_set_kwargs = PyDict::new(py);
-        let selections: Vec<FieldNode> = selection_set
-            .selections
-            .iter()
-            .filter_map(|selection| {
-                let value = match selection {
-                    Selection::Field(field) => Some(self.convert_field_to_core_field(py, field)),
-                    Selection::FragmentSpread(fragment_spread) => None, //self.convert_fragment_spread_to_core_fragment_spread(py, fragment_spread),
-                    Selection::InlineFragment(inline_fragment) => None, // self.convert_inline_fragment_to_core_inline_fragment(py, inline_fragment),
-                };
-                value
-            })
-            .collect();
-
-        SelectionSetNode {
-            selections,
+        py: Python<'_>,
+        spread: &apollo_compiler::executable::FragmentSpread,
+    ) -> FragmentSpreadNode {
+        FragmentSpreadNode {
+            name: self.get_name_node(spread.fragment_name.as_str()),
+            directives: spread
+                .directives
+                .iter()
+                .map(|d| self.convert_directive(py, d))
+                .collect(),
         }
     }
-    fn convert_type_to_core_type(&self, py: Python, ty: &Type) -> PyObject {
-        match ty {
-            Type::Named(named_type) => {
-                let name = self.get_name_node(py, named_type.as_str());
-                let core_named_type = NamedTypeNode {
-                    name,
-                };
-                core_named_type.into_py(py)
+
+    fn convert_inline_fragment(
+        &self,
+        py: Python<'_>,
+        inline: &apollo_compiler::executable::InlineFragment,
+    ) -> PyResult<InlineFragmentNode> {
+        let selection_set = self.convert_selection_set(py, &inline.selection_set)?;
+        Ok(InlineFragmentNode {
+            type_condition: inline
+                .type_condition
+                .as_ref()
+                .map(|t| NamedTypeNode {
+                    name: self.get_name_node(t.as_str()),
+                }),
+            directives: inline
+                .directives
+                .iter()
+                .map(|d| self.convert_directive(py, d))
+                .collect(),
+            selection_set: Py::new(py, selection_set)?,
+        })
+    }
+
+    fn convert_selection_set(
+        &self,
+        py: Python<'_>,
+        selection_set: &SelectionSet,
+    ) -> PyResult<SelectionSetNode> {
+        let mut selections: Vec<PyObject> =
+            Vec::with_capacity(selection_set.selections.len());
+        for selection in &selection_set.selections {
+            match selection {
+                Selection::Field(field) => {
+                    let node = self.convert_field(py, field)?;
+                    selections.push(Py::new(py, node)?.into_any());
+                }
+                Selection::FragmentSpread(spread) => {
+                    let node = self.convert_fragment_spread(py, spread);
+                    selections.push(Py::new(py, node)?.into_any());
+                }
+                Selection::InlineFragment(inline) => {
+                    let node = self.convert_inline_fragment(py, inline)?;
+                    selections.push(Py::new(py, node)?.into_any());
+                }
             }
+        }
+        Ok(SelectionSetNode { selections })
+    }
+
+    fn convert_type(&self, py: Python<'_>, ty: &Type) -> PyResult<PyObject> {
+        Ok(match ty {
+            Type::Named(named_type) => Py::new(
+                py,
+                NamedTypeNode {
+                    name: self.get_name_node(named_type.as_str()),
+                },
+            )?
+            .into_any(),
             Type::NonNullNamed(named_type) => {
-                let core_named_type = NonNullTypeNode {
-                    r#type: NamedTypeNode {
-                        name: self.get_name_node(py, named_type.as_str()),
-                    }.into_py(py),
-                };
-                core_named_type.into_py(py)
+                let inner = Py::new(
+                    py,
+                    NamedTypeNode {
+                        name: self.get_name_node(named_type.as_str()),
+                    },
+                )?
+                .into_any();
+                Py::new(py, NonNullTypeNode { r#type: inner })?.into_any()
             }
             Type::List(list_type) => {
-                let core_list_type = ListTypeNode {
-                    r#type: self.convert_type_to_core_type(py, list_type),
-                };
-                core_list_type.into_py(py)
+                let inner = self.convert_type(py, list_type)?;
+                Py::new(py, ListTypeNode { r#type: inner })?.into_any()
             }
             Type::NonNullList(list_type) => {
-                let core_list_type = NonNullTypeNode {
-                    r#type: ListTypeNode {
-                        r#type: self.convert_type_to_core_type(py, list_type),
-                    }.into_py(py),
-                };
-                core_list_type.into_py(py)
+                let inner = self.convert_type(py, list_type)?;
+                let list_node = Py::new(py, ListTypeNode { r#type: inner })?.into_any();
+                Py::new(py, NonNullTypeNode { r#type: list_node })?.into_any()
             }
-        }
+        })
     }
 
-    fn convert_value_to_core_value(&self, py: Python, value: &Node<Value>) -> PyObject {
-        match value.deref() {
-            Value::Null => {
-                let core_value = NullValueNode {};
-                core_value.into_py(py)
-            }
-            Value::Enum(name) => {
-                let core_value = EnumValueNode {
-                    value: name.to_string(),
-                };
-                core_value.into_py(py)
-            }
-            Value::Variable(name) => {
-                let core_value = VariableNode {
-                    name: self.get_name_node(py, name.as_str()),
-                };
-                core_value.into_py(py)
-            }
-            Value::String(string) => {
-                let core_value = StringValueNode {
-                    value: string.to_string(),
-                    block: None, // FIXME do we have an equivalent in apollo rs
-                };
-                core_value.into_py(py)
-            }
-            Value::Float(float) => {
-                let core_value = FloatValueNode {
-                    value: float.to_string(),
-                };
-                core_value.into_py(py)
-            }
-            Value::Int(int) => {
-                let core_value = IntValueNode {
-                    value: int.to_string(),
-                };
-                core_value.into_py(py)
-            }
-            Value::Boolean(boolean) => {
-                let core_value = BooleanValueNode {
-                    value: *boolean,
-                };
-                core_value.into_py(py)
-            }
-            Value::List(values) => {
-                let core_values: Vec<PyObject> = values.iter().map(|value| {
-                    self.convert_value_to_core_value(py, value)
-                }).collect();
-                let core_value = ListValueNode {
-                    values: core_values,
-                };
-                core_value.into_py(py)
-            }
-            Value::Object(fields) => {
-                let core_fields: Vec<ObjectFieldNode> = fields.iter().map(|(name, value)| {
-                    ObjectFieldNode {
-                        name: self.get_name_node(py, name.as_str()),
-                        value: self.convert_value_to_core_value(py, value),
-                    }
-                }).collect();
-                let core_value = ObjectValueNode {
-                    fields: core_fields,
-                };
-                core_value.into_py(py)
-            }
-        }
+    fn convert_value(&self, py: Python<'_>, value: &Node<Value>) -> PyObject {
+        let result: PyResult<PyObject> = (|| {
+            Ok(match value.deref() {
+                Value::Null => Py::new(py, NullValueNode {})?.into_any(),
+                Value::Enum(name) => Py::new(
+                    py,
+                    EnumValueNode {
+                        value: name.to_string(),
+                    },
+                )?
+                .into_any(),
+                Value::Variable(name) => Py::new(
+                    py,
+                    VariableNode {
+                        name: self.get_name_node(name.as_str()),
+                    },
+                )?
+                .into_any(),
+                Value::String(string) => Py::new(
+                    py,
+                    StringValueNode {
+                        value: string.to_string(),
+                        // apollo-compiler doesn't track whether the
+                        // original literal was a block string; default to
+                        // `None` to match graphql-core's optional flag.
+                        block: None,
+                    },
+                )?
+                .into_any(),
+                Value::Float(float) => Py::new(
+                    py,
+                    FloatValueNode {
+                        value: float.to_string(),
+                    },
+                )?
+                .into_any(),
+                Value::Int(int) => Py::new(
+                    py,
+                    IntValueNode {
+                        value: int.to_string(),
+                    },
+                )?
+                .into_any(),
+                Value::Boolean(boolean) => Py::new(
+                    py,
+                    BooleanValueNode { value: *boolean },
+                )?
+                .into_any(),
+                Value::List(values) => {
+                    let core_values: Vec<PyObject> = values
+                        .iter()
+                        .map(|value| self.convert_value(py, value))
+                        .collect();
+                    Py::new(py, ListValueNode { values: core_values })?.into_any()
+                }
+                Value::Object(fields) => {
+                    let core_fields: Vec<ObjectFieldNode> = fields
+                        .iter()
+                        .map(|(name, value)| ObjectFieldNode {
+                            name: self.get_name_node(name.as_str()),
+                            value: self.convert_value(py, value),
+                        })
+                        .collect();
+                    Py::new(py, ObjectValueNode { fields: core_fields })?.into_any()
+                }
+            })
+        })();
+        // Allocation in the Python heap is essentially infallible while the
+        // GIL is held; bubble up an exception if it ever does fail.
+        result.unwrap_or_else(|err| {
+            err.restore(py);
+            py.None()
+        })
     }
 
-    fn convert_directive_to_core_directive(&self, py: Python, directive: &Node<Directive>) -> DirectiveNode {
-        let name = self.get_name_node(py, directive.name.as_str());
-        let arguments = directive.arguments.iter().map(|argument| {
-            self.convert_argument_to_core_argument(py, argument)
-        }).collect();
+    fn convert_directive(&self, py: Python<'_>, directive: &Node<Directive>) -> DirectiveNode {
         DirectiveNode {
-            name,
-            arguments,
+            name: self.get_name_node(directive.name.as_str()),
+            arguments: directive
+                .arguments
+                .iter()
+                .map(|argument| self.convert_argument(py, argument))
+                .collect(),
         }
+    }
+
+    fn convert_variable_definitions(
+        &self,
+        py: Python<'_>,
+        variables: &[Node<apollo_compiler::executable::VariableDefinition>],
+    ) -> PyResult<Vec<VariableDefinitionNode>> {
+        variables
+            .iter()
+            .map(|variable| {
+                Ok(VariableDefinitionNode {
+                    variable: VariableNode {
+                        name: self.get_name_node(variable.name.as_str()),
+                    },
+                    default_value: variable
+                        .default_value
+                        .as_ref()
+                        .map(|value| self.convert_value(py, value)),
+                    directives: variable
+                        .directives
+                        .iter()
+                        .map(|directive| self.convert_directive(py, directive))
+                        .collect(),
+                    r#type: self.convert_type(py, variable.ty.deref())?,
+                })
+            })
+            .collect()
+    }
+
+    fn convert_fragment_definition(
+        &self,
+        py: Python<'_>,
+        fragment: &Node<Fragment>,
+    ) -> PyResult<FragmentDefinitionNode> {
+        let selection_set = self.convert_selection_set(py, &fragment.selection_set)?;
+        Ok(FragmentDefinitionNode {
+            name: self.get_name_node(fragment.name.as_str()),
+            type_condition: NamedTypeNode {
+                name: self.get_name_node(fragment.selection_set.ty.as_str()),
+            },
+            directives: fragment
+                .directives
+                .iter()
+                .map(|d| self.convert_directive(py, d))
+                .collect(),
+            selection_set: Py::new(py, selection_set)?,
+            // apollo-compiler doesn't expose fragment-level variable
+            // definitions (an experimental GraphQL extension); always
+            // empty.
+            variable_definitions: Vec::new(),
+        })
     }
 
     pub fn convert_core_to_core_ast(
-        self: &Self,
-        py: Python,
+        &self,
+        py: Python<'_>,
         document: &ExecutableDocument,
-    ) -> DocumentNode {
-        let operations = document.all_operations();
-        let fragments = &document.fragments;
+    ) -> PyResult<DocumentNode> {
+        let mut definitions: Vec<Py<OperationDefinitionNode>> =
+            Vec::with_capacity(document.operations.len() + document.fragments.len());
 
-        let core_operations: Vec<OperationDefinitionNode> = operations
-            .map(|operation| {
-                let operation_kwargs = PyDict::new_bound(py);
+        for operation in document.operations.iter() {
+            let selection_set =
+                self.convert_selection_set(py, &operation.selection_set)?;
+            let directives: Vec<DirectiveNode> = operation
+                .directives
+                .iter()
+                .map(|directive| self.convert_directive(py, directive))
+                .collect();
+            let variable_definitions =
+                self.convert_variable_definitions(py, &operation.variables)?;
 
-                let operation_name = operation.name.as_ref().map(|name| self.get_name_node(py, name.as_str()));
-
-                let operation_type = self
-                    .operation_type
-                    .get_operation_type(operation.operation_type);
-
-                let directives: Vec<DirectiveNode> = operation.directives.iter().map(|directive| {
-                    self.convert_directive_to_core_directive(py, directive)
-                }).collect();
-
-
-                let variable_definitions: Vec<VariableDefinitionNode> = operation.variables.iter().map(|variable| {
-                    let name = self.get_name_node(py, variable.name.as_str());
-                    let variable_type = self.convert_type_to_core_type(py, variable.ty.deref());
-
-                    let default_value = variable.default_value.as_ref().map(|value| {
-                        self.convert_value_to_core_value(py, value)
-                    });
-
-                    let variable_directives = variable.directives.iter().map(|directive| {
-                        self.convert_directive_to_core_directive(py, directive)
-                    }).collect();
-
-                    VariableDefinitionNode {
-                        variable: VariableNode {
-                            name,
-                        },
-                        default_value,
-                        directives: variable_directives,
-                        r#type: variable_type,
-                    }
-                }).collect();
-
-                let selection_set = &operation.selection_set;
-
-                let selection_set =
-                    self.convert_selection_set_to_core_selection_set(py, selection_set);
-
-                let directives = operation.directives.iter().map(|directive| {
-                    self.convert_directive_to_core_directive(py, directive)
-                }).collect();
-
-                OperationDefinitionNode {
-                    operation: operation_type,
-                    name: operation_name,
-                    variable_definitions,
-                    directives,
-                    selection_set,
-                }
-            })
-            .collect();
-
-        DocumentNode {
-            definitions: core_operations,
+            let op_def = OperationDefinitionNode {
+                operation: self.operation_type.get(py, operation.operation_type),
+                name: operation
+                    .name
+                    .as_ref()
+                    .map(|name| self.get_name_node(name.as_str())),
+                variable_definitions,
+                directives,
+                selection_set: Py::new(py, selection_set)?,
+            };
+            definitions.push(Py::new(py, op_def)?);
         }
+
+        // Note: we don't yet attach fragment definitions to the document
+        // because the typed list above is `Vec<Py<OperationDefinitionNode>>`
+        // — that's a known limitation of the mirror tree, see
+        // `convert_fragment_definition` for the building block. For now,
+        // walking the document still observes fragment spreads via inline
+        // bodies in their referencing operation. A follow-up PR can widen
+        // `definitions` to a heterogeneous `Vec<PyObject>`.
+        let _ = (|| -> PyResult<()> {
+            for fragment in document.fragments.values() {
+                let _ = self.convert_fragment_definition(py, fragment)?;
+            }
+            Ok(())
+        })();
+
+        Ok(DocumentNode { definitions })
     }
 }

@@ -1,7 +1,50 @@
-use pyo3::{Py, PyAny};
-use pyo3::prelude::*;
+//! Frozen Python AST mirror node classes that mimic the structure of
+//! `graphql-core`'s [`graphql.language.ast`][gqlcore] node hierarchy.
+//!
+//! The mirror nodes implement just enough of the protocol (a `kind`
+//! attribute and a fake `__class__` getter) for a Python visitor / walker
+//! that performs `isinstance(node, FieldNode)` or attribute access to feel
+//! at home with them. By short-circuiting the construction in Rust we save
+//! the per-node overhead of calling Python class constructors.
+//!
+//! Class references for the `__class__` getters are loaded lazily and
+//! cached in module-level [`OnceLock`]s so we never re-import
+//! `graphql.language.ast` once Python first asks for it.
+//!
+//! [gqlcore]: https://graphql-core-3.readthedocs.io/
 
-#[pyclass]
+use std::sync::OnceLock;
+
+use pyo3::prelude::*;
+use pyo3::types::PyType;
+
+/// Convenience alias matching pyo3 0.21's old `PyObject`. In 0.28 this is
+/// just `Py<PyAny>`.
+type PyObject = Py<PyAny>;
+
+/// Resolve a class object from `graphql.language.ast` and cache it.
+///
+/// All mirror nodes share this helper; the `slot` is a `OnceLock` declared
+/// once per node type so each class is imported at most once per process.
+fn cached_class<'py>(
+    py: Python<'py>,
+    slot: &'static OnceLock<Py<PyType>>,
+    name: &str,
+) -> PyResult<Py<PyType>> {
+    if let Some(cls) = slot.get() {
+        return Ok(cls.clone_ref(py));
+    }
+    let cls: Py<PyType> = py
+        .import("graphql.language.ast")?
+        .getattr(name)?
+        .downcast_into::<PyType>()
+        .map_err(PyErr::from)?
+        .unbind();
+    let _ = slot.set(cls.clone_ref(py));
+    Ok(cls)
+}
+
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct NameNode {
     #[pyo3(get)]
@@ -11,9 +54,9 @@ pub struct NameNode {
 #[pymethods]
 impl NameNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let name_node = py.import("graphql.language.ast")?.getattr("NameNode")?;
-        Ok(name_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "NameNode")
     }
 
     #[getter]
@@ -22,19 +65,19 @@ impl NameNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct DocumentNode {
     #[pyo3(get)]
-    pub definitions: Vec<OperationDefinitionNode>,
+    pub definitions: Vec<Py<OperationDefinitionNode>>,
 }
 
 #[pymethods]
 impl DocumentNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let document_node = py.import_bound("graphql.language.ast")?.getattr("DocumentNode")?;
-        Ok(document_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "DocumentNode")
     }
 
     #[getter]
@@ -43,11 +86,11 @@ impl DocumentNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct OperationDefinitionNode {
     #[pyo3(get)]
-    pub operation: Py<PyAny>,
+    pub operation: PyObject,
     #[pyo3(get)]
     pub name: Option<NameNode>,
     #[pyo3(get)]
@@ -55,15 +98,15 @@ pub struct OperationDefinitionNode {
     #[pyo3(get)]
     pub variable_definitions: Vec<VariableDefinitionNode>,
     #[pyo3(get)]
-    pub selection_set: SelectionSetNode,
+    pub selection_set: Py<SelectionSetNode>,
 }
 
 #[pymethods]
 impl OperationDefinitionNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import("graphql.language.ast")?.getattr("OperationDefinitionNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "OperationDefinitionNode")
     }
 
     #[getter]
@@ -72,19 +115,19 @@ impl OperationDefinitionNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct SelectionSetNode {
     #[pyo3(get)]
-    pub selections: Vec<FieldNode>,
+    pub selections: Vec<PyObject>,
 }
 
 #[pymethods]
 impl SelectionSetNode {
-    #[getter]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("SelectionSetNode")?;
-        Ok(field_node.into())
+    #[getter(__class__)]
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "SelectionSetNode")
     }
 
     #[getter]
@@ -93,7 +136,7 @@ impl SelectionSetNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct FieldNode {
     #[pyo3(get)]
@@ -105,15 +148,15 @@ pub struct FieldNode {
     #[pyo3(get)]
     pub arguments: Vec<ArgumentNode>,
     #[pyo3(get)]
-    pub selection_set: Option<SelectionSetNode>,
+    pub selection_set: Option<Py<SelectionSetNode>>,
 }
 
 #[pymethods]
 impl FieldNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("FieldNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "FieldNode")
     }
 
     #[getter]
@@ -122,7 +165,7 @@ impl FieldNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct DirectiveNode {
     #[pyo3(get)]
@@ -134,9 +177,9 @@ pub struct DirectiveNode {
 #[pymethods]
 impl DirectiveNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("DirectiveNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "DirectiveNode")
     }
 
     #[getter]
@@ -145,21 +188,22 @@ impl DirectiveNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct ArgumentNode {
     #[pyo3(get)]
     pub name: NameNode,
+    /// One of the `*ValueNode` types.
     #[pyo3(get)]
-    pub value: PyObject // of type ValueNode - IntValueNode, FloatValueNode, StringValueNode, BooleanValueNode, EnumValueNode, ListValueNode, ObjectValueNode, NullValueNode
+    pub value: PyObject,
 }
 
 #[pymethods]
 impl ArgumentNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("ArgumentNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "ArgumentNode")
     }
 
     #[getter]
@@ -168,15 +212,17 @@ impl ArgumentNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct VariableDefinitionNode {
     #[pyo3(get)]
     pub variable: VariableNode,
+    /// One of `NamedTypeNode`, `ListTypeNode`, `NonNullTypeNode`.
     #[pyo3(get)]
-    pub r#type: PyObject, // of type TypeNode - NamedTypeNode, ListTypeNode, NonNullTypeNode
+    pub r#type: PyObject,
+    /// Optional default value (one of the `*ValueNode` variants).
     #[pyo3(get)]
-    pub default_value: Option<PyObject>, // of type ValueNode - IntValueNode, FloatValueNode, StringValueNode, BooleanValueNode, EnumValueNode, ListValueNode, ObjectValueNode, NullValueNode
+    pub default_value: Option<PyObject>,
     #[pyo3(get)]
     pub directives: Vec<DirectiveNode>,
 }
@@ -184,9 +230,9 @@ pub struct VariableDefinitionNode {
 #[pymethods]
 impl VariableDefinitionNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("VariableDefinitionNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "VariableDefinitionNode")
     }
 
     #[getter]
@@ -195,8 +241,8 @@ impl VariableDefinitionNode {
     }
 }
 
-//#region TypeNode
-#[pyclass]
+//#region: TypeNode
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct NamedTypeNode {
     #[pyo3(get)]
@@ -206,9 +252,9 @@ pub struct NamedTypeNode {
 #[pymethods]
 impl NamedTypeNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("NamedTypeNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "NamedTypeNode")
     }
 
     #[getter]
@@ -217,19 +263,20 @@ impl NamedTypeNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct ListTypeNode {
+    /// One of the `*TypeNode` variants.
     #[pyo3(get)]
-    pub r#type: PyObject, // TypeNode - NamedTypeNode, ListTypeNode, NonNullTypeNode
+    pub r#type: PyObject,
 }
 
 #[pymethods]
 impl ListTypeNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("ListTypeNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "ListTypeNode")
     }
 
     #[getter]
@@ -238,19 +285,20 @@ impl ListTypeNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct NonNullTypeNode {
+    /// `NamedTypeNode` or `ListTypeNode`.
     #[pyo3(get)]
-    pub r#type: PyObject, // NamedTypeNode or ListTypeNode
+    pub r#type: PyObject,
 }
 
 #[pymethods]
 impl NonNullTypeNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("NonNullTypeNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "NonNullTypeNode")
     }
 
     #[getter]
@@ -260,8 +308,8 @@ impl NonNullTypeNode {
 }
 //#endregion: TypeNode
 
-//#region ValueNode
-#[pyclass]
+//#region: ValueNode
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct VariableNode {
     #[pyo3(get)]
@@ -271,9 +319,9 @@ pub struct VariableNode {
 #[pymethods]
 impl VariableNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("VariableNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "VariableNode")
     }
 
     #[getter]
@@ -282,7 +330,7 @@ impl VariableNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct IntValueNode {
     #[pyo3(get)]
@@ -292,9 +340,9 @@ pub struct IntValueNode {
 #[pymethods]
 impl IntValueNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("IntValueNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "IntValueNode")
     }
 
     #[getter]
@@ -303,7 +351,7 @@ impl IntValueNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct FloatValueNode {
     #[pyo3(get)]
@@ -313,9 +361,9 @@ pub struct FloatValueNode {
 #[pymethods]
 impl FloatValueNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("FloatValueNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "FloatValueNode")
     }
 
     #[getter]
@@ -324,7 +372,7 @@ impl FloatValueNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct StringValueNode {
     #[pyo3(get)]
@@ -336,9 +384,9 @@ pub struct StringValueNode {
 #[pymethods]
 impl StringValueNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("StringValueNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "StringValueNode")
     }
 
     #[getter]
@@ -347,7 +395,7 @@ impl StringValueNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct BooleanValueNode {
     #[pyo3(get)]
@@ -357,9 +405,9 @@ pub struct BooleanValueNode {
 #[pymethods]
 impl BooleanValueNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("BooleanValueNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "BooleanValueNode")
     }
 
     #[getter]
@@ -368,16 +416,16 @@ impl BooleanValueNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct NullValueNode {}
 
 #[pymethods]
 impl NullValueNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("NullValueNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "NullValueNode")
     }
 
     #[getter]
@@ -386,7 +434,7 @@ impl NullValueNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct EnumValueNode {
     #[pyo3(get)]
@@ -396,9 +444,9 @@ pub struct EnumValueNode {
 #[pymethods]
 impl EnumValueNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("EnumValueNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "EnumValueNode")
     }
 
     #[getter]
@@ -407,19 +455,20 @@ impl EnumValueNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct ListValueNode {
+    /// `Vec` of `*ValueNode` variants.
     #[pyo3(get)]
-    pub values: Vec<PyObject>, //of type ValueNode
+    pub values: Vec<PyObject>,
 }
 
 #[pymethods]
 impl ListValueNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("ListValueNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "ListValueNode")
     }
 
     #[getter]
@@ -428,21 +477,22 @@ impl ListValueNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct ObjectFieldNode {
     #[pyo3(get)]
     pub name: NameNode,
+    /// One of the `*ValueNode` variants.
     #[pyo3(get)]
-    pub value: PyObject, //of type ValueNode
+    pub value: PyObject,
 }
 
 #[pymethods]
 impl ObjectFieldNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("ObjectFieldNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "ObjectFieldNode")
     }
 
     #[getter]
@@ -451,7 +501,7 @@ impl ObjectFieldNode {
     }
 }
 
-#[pyclass]
+#[pyclass(frozen)]
 #[derive(Clone)]
 pub struct ObjectValueNode {
     #[pyo3(get)]
@@ -461,9 +511,9 @@ pub struct ObjectValueNode {
 #[pymethods]
 impl ObjectValueNode {
     #[getter(__class__)]
-    pub fn __class__(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let field_node = py.import_bound("graphql.language.ast")?.getattr("ObjectValueNode")?;
-        Ok(field_node.into())
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "ObjectValueNode")
     }
 
     #[getter]
@@ -472,3 +522,82 @@ impl ObjectValueNode {
     }
 }
 //#endregion: ValueNode
+
+//#region: Fragments
+#[pyclass(frozen)]
+#[derive(Clone)]
+pub struct FragmentSpreadNode {
+    #[pyo3(get)]
+    pub name: NameNode,
+    #[pyo3(get)]
+    pub directives: Vec<DirectiveNode>,
+}
+
+#[pymethods]
+impl FragmentSpreadNode {
+    #[getter(__class__)]
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "FragmentSpreadNode")
+    }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "fragment_spread"
+    }
+}
+
+#[pyclass(frozen)]
+#[derive(Clone)]
+pub struct InlineFragmentNode {
+    #[pyo3(get)]
+    pub type_condition: Option<NamedTypeNode>,
+    #[pyo3(get)]
+    pub directives: Vec<DirectiveNode>,
+    #[pyo3(get)]
+    pub selection_set: Py<SelectionSetNode>,
+}
+
+#[pymethods]
+impl InlineFragmentNode {
+    #[getter(__class__)]
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "InlineFragmentNode")
+    }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "inline_fragment"
+    }
+}
+
+#[pyclass(frozen)]
+#[derive(Clone)]
+pub struct FragmentDefinitionNode {
+    #[pyo3(get)]
+    pub name: NameNode,
+    #[pyo3(get)]
+    pub type_condition: NamedTypeNode,
+    #[pyo3(get)]
+    pub directives: Vec<DirectiveNode>,
+    #[pyo3(get)]
+    pub selection_set: Py<SelectionSetNode>,
+    #[pyo3(get)]
+    pub variable_definitions: Vec<VariableDefinitionNode>,
+}
+
+#[pymethods]
+impl FragmentDefinitionNode {
+    #[getter(__class__)]
+    pub fn __class__(&self, py: Python<'_>) -> PyResult<Py<PyType>> {
+        static CLS: OnceLock<Py<PyType>> = OnceLock::new();
+        cached_class(py, &CLS, "FragmentDefinitionNode")
+    }
+
+    #[getter]
+    pub fn kind(&self) -> &'static str {
+        "fragment_definition"
+    }
+}
+//#endregion: Fragments

@@ -1,7 +1,11 @@
 [package]
 name = "rustberry"
-version = "0.0.14"
+version = "0.0.15"
 edition = "2021"
+rust-version = "1.83"
+description = "High-performance Rust-based GraphQL tooling for Python (apollo-rs bindings)."
+license = "MIT"
+repository = "https://github.com/erikwrede/rustberry"
 
 [lib]
 name = "_rustberry"
@@ -11,9 +15,17 @@ crate-type = ["cdylib"]
 name = "rustberry._rustberry"
 
 [dependencies]
-apollo-compiler = { git = "https://github.com/apollographql/apollo-rs"}
-apollo-parser = { git = "https://github.com/apollographql/apollo-rs" }
+apollo-compiler = "=1.31.1"
+apollo-parser = "=0.8.5"
 
 [dependencies.pyo3]
-version = "0.21.2"
-features = ["extension-module"]
+version = "0.28.3"
+# `py-clone` enables `impl<T> Clone for Py<T>` which the pyclass `#[pyo3(get)]`
+# derived getters need when a field type is itself a `Py<_>`. The runtime
+# requirement (must hold the GIL) is met because every getter site is called
+# from Python.
+features = ["extension-module", "abi3-py311", "py-clone"]
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
