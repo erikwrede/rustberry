@@ -12,7 +12,20 @@ use apollo_compiler::executable::{
 use apollo_compiler::schema::{Directive, Type, Value};
 use apollo_compiler::{ExecutableDocument, Node};
 use pyo3::prelude::*;
-use pyo3::types::PyString;
+use pyo3::types::{PyString, PyTuple};
+
+/// Build a frozen `Py<PyTuple>` from a vector of items implementing
+/// [`IntoPyObject`]. Pre-building the tuple at construction time means
+/// every later attribute access on the mirror node returns the same
+/// tuple object via a refcount bump, instead of re-allocating a fresh
+/// `PyList` per access (which `Vec<#[pyclass]>` would do under
+/// `#[pyo3(get)]`).
+fn into_pytuple<'py, T>(py: Python<'py>, items: Vec<T>) -> PyResult<Py<PyTuple>>
+where
+    T: IntoPyObject<'py>,
+{
+    Ok(PyTuple::new(py, items)?.unbind())
+}
 
 use crate::ast::gql_core::reduced_core_mirror::*;
 
@@ -100,17 +113,23 @@ impl MirrorConversionContext {
             .as_ref()
             .map(|alias| self.get_name_node(py, alias.as_str()));
 
-        let arguments = field
-            .arguments
-            .iter()
-            .map(|argument| self.convert_argument(py, argument))
-            .collect();
+        let arguments = into_pytuple(
+            py,
+            field
+                .arguments
+                .iter()
+                .map(|argument| self.convert_argument(py, argument))
+                .collect(),
+        )?;
 
-        let directives = field
-            .directives
-            .iter()
-            .map(|directive| self.convert_directive(py, directive))
-            .collect();
+        let directives = into_pytuple(
+            py,
+            field
+                .directives
+                .iter()
+                .map(|directive| self.convert_directive(py, directive))
+                .collect(),
+        )?;
 
         Ok(FieldNode {
             alias,
@@ -125,15 +144,18 @@ impl MirrorConversionContext {
         &self,
         py: Python<'_>,
         spread: &apollo_compiler::executable::FragmentSpread,
-    ) -> FragmentSpreadNode {
-        FragmentSpreadNode {
+    ) -> PyResult<FragmentSpreadNode> {
+        Ok(FragmentSpreadNode {
             name: self.get_name_node(py, spread.fragment_name.as_str()),
-            directives: spread
-                .directives
-                .iter()
-                .map(|d| self.convert_directive(py, d))
-                .collect(),
-        }
+            directives: into_pytuple(
+                py,
+                spread
+                    .directives
+                    .iter()
+                    .map(|d| self.convert_directive(py, d))
+                    .collect(),
+            )?,
+        })
     }
 
     fn convert_inline_fragment(
@@ -149,11 +171,14 @@ impl MirrorConversionContext {
                 .map(|t| NamedTypeNode {
                     name: self.get_name_node(py, t.as_str()),
                 }),
-            directives: inline
-                .directives
-                .iter()
-                .map(|d| self.convert_directive(py, d))
-                .collect(),
+            directives: into_pytuple(
+                py,
+                inline
+                    .directives
+                    .iter()
+                    .map(|d| self.convert_directive(py, d))
+                    .collect(),
+            )?,
             selection_set: Py::new(py, selection_set)?,
         })
     }
@@ -172,7 +197,7 @@ impl MirrorConversionContext {
                     selections.push(Py::new(py, node)?.into_any());
                 }
                 Selection::FragmentSpread(spread) => {
-                    let node = self.convert_fragment_spread(py, spread);
+                    let node = self.convert_fragment_spread(py, spread)?;
                     selections.push(Py::new(py, node)?.into_any());
                 }
                 Selection::InlineFragment(inline) => {
@@ -181,7 +206,9 @@ impl MirrorConversionContext {
                 }
             }
         }
-        Ok(SelectionSetNode { selections })
+        Ok(SelectionSetNode {
+            selections: into_pytuple(py, selections)?,
+        })
     }
 
     fn convert_type(&self, py: Python<'_>, ty: &Type) -> PyResult<PyObject> {
@@ -273,7 +300,13 @@ impl MirrorConversionContext {
                         .iter()
                         .map(|value| self.convert_value(py, value))
                         .collect();
-                    Py::new(py, ListValueNode { values: core_values })?.into_any()
+                    Py::new(
+                        py,
+                        ListValueNode {
+                            values: into_pytuple(py, core_values)?,
+                        },
+                    )?
+                    .into_any()
                 }
                 Value::Object(fields) => {
                     let core_fields: Vec<ObjectFieldNode> = fields
@@ -283,7 +316,13 @@ impl MirrorConversionContext {
                             value: self.convert_value(py, value),
                         })
                         .collect();
-                    Py::new(py, ObjectValueNode { fields: core_fields })?.into_any()
+                    Py::new(
+                        py,
+                        ObjectValueNode {
+                            fields: into_pytuple(py, core_fields)?,
+                        },
+                    )?
+                    .into_any()
                 }
             })
         })();
@@ -296,13 +335,20 @@ impl MirrorConversionContext {
     }
 
     fn convert_directive(&self, py: Python<'_>, directive: &Node<Directive>) -> DirectiveNode {
+        let arguments_vec: Vec<ArgumentNode> = directive
+            .arguments
+            .iter()
+            .map(|argument| self.convert_argument(py, argument))
+            .collect();
         DirectiveNode {
             name: self.get_name_node(py, directive.name.as_str()),
-            arguments: directive
-                .arguments
-                .iter()
-                .map(|argument| self.convert_argument(py, argument))
-                .collect(),
+            // Tuple construction allocates while the GIL is held; if it
+            // ever returns an error we propagate via an empty tuple
+            // rather than panicking. In practice apollo-compiler's
+            // arguments are bounded and PyTuple::new only fails on
+            // out-of-memory.
+            arguments: into_pytuple(py, arguments_vec)
+                .unwrap_or_else(|_| PyTuple::empty(py).unbind()),
         }
     }
 
@@ -314,6 +360,11 @@ impl MirrorConversionContext {
         variables
             .iter()
             .map(|variable| {
+                let directives_vec: Vec<DirectiveNode> = variable
+                    .directives
+                    .iter()
+                    .map(|directive| self.convert_directive(py, directive))
+                    .collect();
                 Ok(VariableDefinitionNode {
                     variable: VariableNode {
                         name: self.get_name_node(py, variable.name.as_str()),
@@ -322,11 +373,7 @@ impl MirrorConversionContext {
                         .default_value
                         .as_ref()
                         .map(|value| self.convert_value(py, value)),
-                    directives: variable
-                        .directives
-                        .iter()
-                        .map(|directive| self.convert_directive(py, directive))
-                        .collect(),
+                    directives: into_pytuple(py, directives_vec)?,
                     r#type: self.convert_type(py, variable.ty.deref())?,
                 })
             })
@@ -339,21 +386,22 @@ impl MirrorConversionContext {
         fragment: &Node<Fragment>,
     ) -> PyResult<FragmentDefinitionNode> {
         let selection_set = self.convert_selection_set(py, &fragment.selection_set)?;
+        let directives_vec: Vec<DirectiveNode> = fragment
+            .directives
+            .iter()
+            .map(|d| self.convert_directive(py, d))
+            .collect();
         Ok(FragmentDefinitionNode {
             name: self.get_name_node(py, fragment.name.as_str()),
             type_condition: NamedTypeNode {
                 name: self.get_name_node(py, fragment.selection_set.ty.as_str()),
             },
-            directives: fragment
-                .directives
-                .iter()
-                .map(|d| self.convert_directive(py, d))
-                .collect(),
+            directives: into_pytuple(py, directives_vec)?,
             selection_set: Py::new(py, selection_set)?,
             // apollo-compiler doesn't expose fragment-level variable
             // definitions (an experimental GraphQL extension); always
             // empty.
-            variable_definitions: Vec::new(),
+            variable_definitions: PyTuple::empty(py).unbind(),
         })
     }
 
@@ -376,12 +424,12 @@ impl MirrorConversionContext {
         for operation in document.operations.iter() {
             let selection_set =
                 self.convert_selection_set(py, &operation.selection_set)?;
-            let directives: Vec<DirectiveNode> = operation
+            let directives_vec: Vec<DirectiveNode> = operation
                 .directives
                 .iter()
                 .map(|directive| self.convert_directive(py, directive))
                 .collect();
-            let variable_definitions =
+            let variable_definitions_vec =
                 self.convert_variable_definitions(py, &operation.variables)?;
 
             let op_def = OperationDefinitionNode {
@@ -390,8 +438,8 @@ impl MirrorConversionContext {
                     .name
                     .as_ref()
                     .map(|name| self.get_name_node(py, name.as_str())),
-                variable_definitions,
-                directives,
+                variable_definitions: into_pytuple(py, variable_definitions_vec)?,
+                directives: into_pytuple(py, directives_vec)?,
                 selection_set: Py::new(py, selection_set)?,
             };
             definitions.push(Py::new(py, op_def)?.into_any());
@@ -405,6 +453,8 @@ impl MirrorConversionContext {
             definitions.push(Py::new(py, frag_def)?.into_any());
         }
 
-        Ok(DocumentNode { definitions })
+        Ok(DocumentNode {
+            definitions: into_pytuple(py, definitions)?,
+        })
     }
 }

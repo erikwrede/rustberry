@@ -39,7 +39,7 @@ use std::sync::OnceLock;
 
 use pyo3::prelude::*;
 use pyo3::sync::OnceLockExt;
-use pyo3::types::{PyString, PyType};
+use pyo3::types::{PyString, PyTuple, PyType};
 
 /// Convenience alias matching pyo3 0.21's old `PyObject`. In 0.28 this is
 /// just `Py<PyAny>`.
@@ -159,7 +159,7 @@ pub struct DocumentNode {
     /// the document root to expand `...FragmentName` selections, so we keep
     /// the Python-visible type wide enough to carry both.
     #[pyo3(get)]
-    pub definitions: Vec<PyObject>,
+    pub definitions: Py<PyTuple>,
 }
 
 #[pymethods]
@@ -189,9 +189,9 @@ pub struct OperationDefinitionNode {
     #[pyo3(get)]
     pub name: Option<NameNode>,
     #[pyo3(get)]
-    pub directives: Vec<DirectiveNode>,
+    pub directives: Py<PyTuple>,
     #[pyo3(get)]
-    pub variable_definitions: Vec<VariableDefinitionNode>,
+    pub variable_definitions: Py<PyTuple>,
     #[pyo3(get)]
     pub selection_set: Py<SelectionSetNode>,
 }
@@ -219,7 +219,7 @@ impl OperationDefinitionNode {
 #[derive(Clone)]
 pub struct SelectionSetNode {
     #[pyo3(get)]
-    pub selections: Vec<PyObject>,
+    pub selections: Py<PyTuple>,
 }
 
 #[pymethods]
@@ -245,13 +245,13 @@ impl SelectionSetNode {
 #[derive(Clone)]
 pub struct FieldNode {
     #[pyo3(get)]
-    pub directives: Vec<DirectiveNode>,
+    pub directives: Py<PyTuple>,
     #[pyo3(get)]
     pub alias: Option<NameNode>,
     #[pyo3(get)]
     pub name: NameNode,
     #[pyo3(get)]
-    pub arguments: Vec<ArgumentNode>,
+    pub arguments: Py<PyTuple>,
     #[pyo3(get)]
     pub selection_set: Option<Py<SelectionSetNode>>,
 }
@@ -281,7 +281,7 @@ pub struct DirectiveNode {
     #[pyo3(get)]
     pub name: NameNode,
     #[pyo3(get)]
-    pub arguments: Vec<ArgumentNode>,
+    pub arguments: Py<PyTuple>,
 }
 
 #[pymethods]
@@ -344,7 +344,7 @@ pub struct VariableDefinitionNode {
     #[pyo3(get)]
     pub default_value: Option<PyObject>,
     #[pyo3(get)]
-    pub directives: Vec<DirectiveNode>,
+    pub directives: Py<PyTuple>,
 }
 
 #[pymethods]
@@ -638,7 +638,7 @@ impl EnumValueNode {
 pub struct ListValueNode {
     /// `Vec` of `*ValueNode` variants.
     #[pyo3(get)]
-    pub values: Vec<PyObject>,
+    pub values: Py<PyTuple>,
 }
 
 #[pymethods]
@@ -693,7 +693,7 @@ impl ObjectFieldNode {
 #[derive(Clone)]
 pub struct ObjectValueNode {
     #[pyo3(get)]
-    pub fields: Vec<ObjectFieldNode>,
+    pub fields: Py<PyTuple>,
 }
 
 #[pymethods]
@@ -723,7 +723,7 @@ pub struct FragmentSpreadNode {
     #[pyo3(get)]
     pub name: NameNode,
     #[pyo3(get)]
-    pub directives: Vec<DirectiveNode>,
+    pub directives: Py<PyTuple>,
 }
 
 #[pymethods]
@@ -751,7 +751,7 @@ pub struct InlineFragmentNode {
     #[pyo3(get)]
     pub type_condition: Option<NamedTypeNode>,
     #[pyo3(get)]
-    pub directives: Vec<DirectiveNode>,
+    pub directives: Py<PyTuple>,
     #[pyo3(get)]
     pub selection_set: Py<SelectionSetNode>,
 }
@@ -783,11 +783,11 @@ pub struct FragmentDefinitionNode {
     #[pyo3(get)]
     pub type_condition: NamedTypeNode,
     #[pyo3(get)]
-    pub directives: Vec<DirectiveNode>,
+    pub directives: Py<PyTuple>,
     #[pyo3(get)]
     pub selection_set: Py<SelectionSetNode>,
     #[pyo3(get)]
-    pub variable_definitions: Vec<VariableDefinitionNode>,
+    pub variable_definitions: Py<PyTuple>,
 }
 
 #[pymethods]
