@@ -1,0 +1,16 @@
+PyO3 #[pyclass] getter vs Python attribute access
+================================================================
+
+Reading obj.value, ns per access (1024 reads/iter, 2000 iters):
+
+  rustberry mirror NameNode              median=   27.9 ns  p95=   29.3 ns  min=   24.5 ns
+  graphql-core NameNode (slots+dict)     median=   10.0 ns  p95=   11.2 ns  min=    8.6 ns
+  Python __slots__ class                 median=   10.5 ns  p95=   10.9 ns  min=    8.5 ns
+  Python __dict__ class                  median=   10.7 ns  p95=   11.1 ns  min=    8.7 ns
+  class attribute (no instance)          median=   10.9 ns  p95=   11.2 ns  min=    8.7 ns
+
+Hypothesis check:
+  If 'rustberry mirror NameNode' is materially slower than
+  'graphql-core NameNode', PyO3 getter overhead dominates and
+  Path A's downside is real. If the two are within ~20%, the
+  AST-creation savings of Path A win.

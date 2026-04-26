@@ -1,0 +1,22 @@
+
+graphql-core baseline (median, p95)
+================================================================================
+                                          Simple          Medium         Complex     Adversarial
+------------------------------------------------------------------------------------------------
+parse                                   13.50 us       146.25 us       802.60 us       364.77 us
+                                  (p95 15.83 us) (p95 166.08 us) (p95 983.46 us) (p95 543.42 us)
+validate                               154.77 us       659.85 us         2.23 ms         1.24 ms
+                                 (p95 338.08 us) (p95 886.67 us)   (p95 3.42 ms)   (p95 1.58 ms)
+construct synthetic AST                 13.29 us        77.67 us       381.60 us       717.71 us
+                                  (p95 13.83 us)  (p95 94.29 us) (p95 412.46 us) (p95 780.04 us)
+walk AST (per-node ns)                  197.0 ns        149.3 ns        148.2 ns        138.1 ns
+                                  (p95 208.4 ns)  (p95 150.3 ns)  (p95 157.2 ns)  (p95 160.8 ns)
+parse+validate+walk                    191.44 us       995.60 us         3.57 ms         1.89 ms
+                                 (p95 378.29 us)   (p95 1.31 ms)   (p95 4.93 ms)   (p95 3.37 ms)
+
+Notes:
+  * 'construct synthetic AST' builds an N-field document via
+    Python class calls (no parsing). Sizes: Simple=1, Medium=10,
+    Complex=50, Adversarial=100 fields.
+  * 'walk AST' is normalised to ns per visited node.
+  * Other rows are total ns per call.

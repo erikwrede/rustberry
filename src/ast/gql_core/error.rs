@@ -68,6 +68,34 @@ impl GraphQLError {
         Ok(PyDict::new(py).into_any().unbind())
     }
 
+    /// graphql-core's `GraphQLError.original_error` carries the wrapped
+    /// exception when an error is re-raised. Apollo-compiler diagnostics are
+    /// not wrappers, so we expose `None` to satisfy AttributeError-prone
+    /// helpers (e.g. Strawberry's error formatter).
+    #[getter]
+    pub fn original_error(&self, py: Python<'_>) -> Py<PyAny> {
+        py.None()
+    }
+
+    /// graphql-core also exposes `nodes`, `source`, and `positions` on
+    /// `GraphQLError`. Apollo-compiler diagnostics don't preserve those, but
+    /// downstream code occasionally probes them — return `None` so attribute
+    /// access never raises.
+    #[getter]
+    pub fn nodes(&self, py: Python<'_>) -> Py<PyAny> {
+        py.None()
+    }
+
+    #[getter]
+    pub fn source(&self, py: Python<'_>) -> Py<PyAny> {
+        py.None()
+    }
+
+    #[getter]
+    pub fn positions(&self, py: Python<'_>) -> Py<PyAny> {
+        py.None()
+    }
+
     /// String representation matches the underlying message — useful when
     /// converting back to a Python `GraphQLError` exception.
     fn __str__(&self) -> &str {

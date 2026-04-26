@@ -1,0 +1,46 @@
+Compiler construction (one-time per schema):
+  median = 0.05 ms (p95 0.06 ms, n=20)
+
+rustberry vs graphql-core (median, p95)
+================================================================================
+                                          Simple          Medium         Complex     Adversarial
+------------------------------------------------------------------------------------------------
+rust parse                               1.29 us        10.67 us        52.08 us        22.58 us
+                                   (p95 1.38 us)  (p95 11.62 us)  (p95 57.75 us)  (p95 24.42 us)
+rust validate (parsed doc)              625.0 ns         4.17 us        29.92 us        10.96 us
+                                  (p95 708.0 ns)   (p95 4.33 us)  (p95 32.92 us)  (p95 11.96 us)
+rust add_validate                        1.67 us        14.79 us        82.00 us        33.21 us
+                                   (p95 1.88 us)  (p95 15.54 us)  (p95 88.79 us)  (p95 37.62 us)
+rust -> py AST (Path B)                  8.29 us        24.17 us       129.83 us         9.25 us
+                                   (p95 8.71 us)  (p95 30.33 us) (p95 144.79 us)  (p95 10.58 us)
+rust -> mirror AST (Path A)             208.0 ns        958.0 ns         5.62 us         1.96 us
+                                  (p95 250.0 ns)   (p95 1.04 us)   (p95 7.54 us)   (p95 2.04 us)
+walk mirror (per-node ns)               204.5 ns        156.4 ns        167.1 ns        182.4 ns
+                                  (p95 284.1 ns)  (p95 174.7 ns)  (p95 205.0 ns)  (p95 188.1 ns)
+walk py AST (per-node ns)               181.8 ns        138.6 ns        126.3 ns        166.7 ns
+                                  (p95 219.6 ns)  (p95 191.9 ns)  (p95 155.9 ns)  (p95 210.8 ns)
+graphql-core (baseline)                192.52 us         1.01 ms         3.64 ms         1.90 ms
+                                 (p95 377.12 us)   (p95 1.25 ms)   (p95 5.07 ms)   (p95 3.01 ms)
+rustberry mirror (Path A)                4.33 us        33.12 us       190.83 us        43.06 us
+                                   (p95 4.88 us)  (p95 33.88 us) (p95 209.83 us)  (p95 55.21 us)
+rustberry python (Path B)               11.88 us        50.92 us       246.31 us        46.73 us
+                                  (p95 13.17 us) (p95 178.25 us) (p95 288.12 us)  (p95 58.33 us)
+rustberry validate-only (D)             18.21 us       189.90 us         1.02 ms       464.19 us
+                                  (p95 22.58 us) (p95 221.58 us)   (p95 1.25 ms) (p95 653.04 us)
+
+Pipeline speedup vs graphql-core (>1.0 = faster than baseline)
+================================================================================================
+                                          Simple          Medium         Complex     Adversarial
+------------------------------------------------------------------------------------------------
+graphql-core (baseline)                    1.00x           1.00x           1.00x           1.00x
+rustberry mirror (Path A)                 44.42x          30.49x          19.08x          44.19x
+rustberry python (Path B)                 16.21x          19.83x          14.78x          40.72x
+rustberry validate-only (D)               10.57x           5.32x           3.57x           4.10x
+
+Interpretation hints:
+  * 'rust parse' should be <<1 us for Simple if PyO3 overhead is low.
+  * Big gap between mirror and python on the *walk* row points to
+    PyO3 getter overhead -- exactly what bench_pyclass_overhead.py
+    isolates.
+  * Path D >1.0x speedup only if rust validation is so much faster
+    than graphql-core's that paying for a second parse is still worth it.

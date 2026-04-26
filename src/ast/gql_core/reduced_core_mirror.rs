@@ -102,6 +102,25 @@ macro_rules! kind_str {
     }};
 }
 
+/// Body for the `loc` getter on every mirror node.
+///
+/// `graphql-core`'s `Node` exposes `loc` as either `None` or a
+/// `Location(start, end, source)`. apollo-compiler does not surface
+/// per-typed-AST-node source ranges in a form we can cheaply translate,
+/// so we expose a stable `None` — which is exactly what `graphql-core`
+/// returns for documents constructed without a source (e.g. in tests).
+///
+/// Returning `None` is enough to satisfy attribute probes from
+/// `graphql-core`'s executor and Strawberry's runtime-error formatter
+/// without pretending we have data we don't have. As with [`kind_str!`]
+/// the body is inlined per-impl because the surrounding `#[getter]`
+/// attribute must be visible to the `#[pymethods]` proc macro.
+macro_rules! loc_none {
+    ($py:expr) => {{
+        $py.None()
+    }};
+}
+
 #[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct NameNode {
@@ -123,6 +142,11 @@ impl NameNode {
     #[getter]
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "name")
+    }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
     }
 }
 
@@ -149,6 +173,11 @@ impl DocumentNode {
     #[getter]
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "document")
+    }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
     }
 }
 
@@ -179,6 +208,11 @@ impl OperationDefinitionNode {
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "operation_definition")
     }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
+    }
 }
 
 #[pyclass(frozen, skip_from_py_object)]
@@ -199,6 +233,11 @@ impl SelectionSetNode {
     #[getter]
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "selection_set")
+    }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
     }
 }
 
@@ -229,6 +268,11 @@ impl FieldNode {
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "field")
     }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
+    }
 }
 
 #[pyclass(frozen, skip_from_py_object)]
@@ -251,6 +295,11 @@ impl DirectiveNode {
     #[getter]
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "directive")
+    }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
     }
 }
 
@@ -275,6 +324,11 @@ impl ArgumentNode {
     #[getter]
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "argument")
+    }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
     }
 }
 
@@ -305,6 +359,11 @@ impl VariableDefinitionNode {
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "variable_definition")
     }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
+    }
 }
 
 //#region: TypeNode
@@ -326,6 +385,11 @@ impl NamedTypeNode {
     #[getter]
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "named_type")
+    }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
     }
 }
 
@@ -349,6 +413,11 @@ impl ListTypeNode {
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "list_type")
     }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
+    }
 }
 
 #[pyclass(frozen, skip_from_py_object)]
@@ -370,6 +439,11 @@ impl NonNullTypeNode {
     #[getter]
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "non_null_type")
+    }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
     }
 }
 //#endregion: TypeNode
@@ -393,6 +467,11 @@ impl VariableNode {
     #[getter]
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "variable")
+    }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
     }
 }
 
@@ -418,6 +497,11 @@ impl IntValueNode {
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "int_value")
     }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
+    }
 }
 
 #[pyclass(frozen, skip_from_py_object)]
@@ -438,6 +522,11 @@ impl FloatValueNode {
     #[getter]
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "float_value")
+    }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
     }
 }
 
@@ -462,6 +551,11 @@ impl StringValueNode {
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "string_value")
     }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
+    }
 }
 
 #[pyclass(frozen, skip_from_py_object)]
@@ -483,6 +577,11 @@ impl BooleanValueNode {
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "boolean_value")
     }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
+    }
 }
 
 #[pyclass(frozen, skip_from_py_object)]
@@ -500,6 +599,11 @@ impl NullValueNode {
     #[getter]
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "null_value")
+    }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
     }
 }
 
@@ -522,6 +626,11 @@ impl EnumValueNode {
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "enum_value")
     }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
+    }
 }
 
 #[pyclass(frozen, skip_from_py_object)]
@@ -543,6 +652,11 @@ impl ListValueNode {
     #[getter]
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "list_value")
+    }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
     }
 }
 
@@ -568,6 +682,11 @@ impl ObjectFieldNode {
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "object_field")
     }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
+    }
 }
 
 #[pyclass(frozen, skip_from_py_object)]
@@ -588,6 +707,11 @@ impl ObjectValueNode {
     #[getter]
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "object_value")
+    }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
     }
 }
 //#endregion: ValueNode
@@ -614,6 +738,11 @@ impl FragmentSpreadNode {
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "fragment_spread")
     }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        loc_none!(py)
+    }
 }
 
 #[pyclass(frozen, skip_from_py_object)]
@@ -638,6 +767,11 @@ impl InlineFragmentNode {
     #[getter]
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "inline_fragment")
+    }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        py.None()
     }
 }
 
@@ -667,6 +801,11 @@ impl FragmentDefinitionNode {
     #[getter]
     pub fn kind<'py>(&self, py: Python<'py>) -> Bound<'py, PyString> {
         kind_str!(py, "fragment_definition")
+    }
+
+    #[getter]
+    pub fn loc(&self, py: Python<'_>) -> Py<PyAny> {
+        py.None()
     }
 }
 //#endregion: Fragments
