@@ -1,128 +1,169 @@
-//use pyo3::wrap_pyfunction;
-extern crate apollo_compiler;
+//! Python bindings for apollo-rs's GraphQL compiler.
+//!
+//! Exposes a [`QueryCompiler`] class that parses, validates and converts
+//! GraphQL queries into a Python AST compatible with `graphql-core`.
 
-use apollo_compiler::{ExecutableDocument, Schema};
 use apollo_compiler::validation::Valid;
+use apollo_compiler::{ExecutableDocument, Schema};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 use crate::ast::gql_core::converter::CoreConversionContext;
+use crate::ast::gql_core::error::GraphQLError;
 use crate::ast::gql_core::mirror_converter::MirrorConversionContext;
 use crate::ast::gql_core::reduced_core_mirror::DocumentNode;
 
 mod ast;
 mod util;
 
-//use pyo3::types::{PyString,PyUnicode};
-
+/// Opaque handle to a parsed `apollo-compiler` executable document.
+///
+/// Returned from [`QueryCompiler::parse`] and accepted by
+/// [`QueryCompiler::validate`] / [`QueryCompiler::gql_core_ast`] /
+/// [`QueryCompiler::gql_core_ast_mirror`].
 #[pyclass]
-#[derive(Clone)]
-struct Document {
+pub struct Document {
     document: ExecutableDocument,
 }
 
-#[pymethods]
-impl Document {}
-
+/// Persistent compiler that holds a parsed schema and reusable conversion
+/// contexts. Re-use a single instance across many queries to amortise the
+/// cost of parsing the schema and importing `graphql-core`'s AST module.
 #[pyclass]
-struct QueryCompiler {
+pub struct QueryCompiler {
     schema: Valid<Schema>,
     conversion_context: CoreConversionContext,
     mirror_conversion_context: MirrorConversionContext,
 }
 
+/// Format an apollo-compiler `WithErrors` value into a single human-readable
+/// string suitable for use as the message of a Python exception.
+///
+/// We deliberately render the JSON-shaped message (no ariadne snippet) so we
+/// don't get spurious "Unable to fetch source" lines on stderr when the
+/// schema source isn't part of the document's source map.
+fn format_with_errors<T>(errors: &apollo_compiler::validation::WithErrors<T>) -> String {
+    errors
+        .errors
+        .iter()
+        .map(|d| d.to_json().message)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[pymethods]
 impl QueryCompiler {
+    /// Build a compiler from a SDL document. The schema is parsed but not
+    /// validated; we treat user-provided schemas as authoritative
+    /// (`Valid::assume_valid`).
     #[new]
-    fn new(schema: String) -> Self {
-        let apollo_schema = Schema::parse(schema.clone(), "document.graphql").unwrap();
-        let conversion_context = Python::with_gil(|py| CoreConversionContext::new(py));
-        let mirror_conversion_context = Python::with_gil(|py| MirrorConversionContext::new(py));
+    fn new(py: Python<'_>, schema: String) -> PyResult<Self> {
+        // Parse without holding the GIL – pure CPU work in apollo-rs.
+        let parsed = py
+            .detach(|| Schema::parse(schema, "schema.graphql"))
+            .map_err(|errors| {
+                PyValueError::new_err(format!(
+                    "failed to parse schema: {}",
+                    format_with_errors(&errors)
+                ))
+            })?;
 
-        Self {
-            schema: Valid::assume_valid(apollo_schema),
+        let conversion_context = CoreConversionContext::new(py)?;
+        let mirror_conversion_context = MirrorConversionContext::new(py)?;
+
+        Ok(Self {
+            schema: Valid::assume_valid(parsed),
             conversion_context,
             mirror_conversion_context,
-        }
+        })
     }
 
-    fn parse(&mut self, document: &str) -> PyResult<Document> {
-        let result = ExecutableDocument::parse(&self.schema, document, "document.graphql");
+    /// Parse `document` against the schema. Raises `ValueError` on parse
+    /// errors.
+    fn parse(&self, py: Python<'_>, document: &str) -> PyResult<Document> {
+        let result = py.detach(|| {
+            ExecutableDocument::parse(&self.schema, document, "document.graphql")
+        });
 
         match result {
-            Ok(valid_doc) => Ok(Document {
-                document: valid_doc,
-            }),
-            Err(with_errors) => {
-                let errors = with_errors.errors;
-                panic!("{:?}", errors);
-                // let rustberry_errors = errors
-                //     .iter()
-                //     .map(|e| GraphQLError {
-                //         compiler_error: ApolloGraphQLError::new(
-                //             e.error.unstable_compat_message().unwrap_or(e.to_string()),
-                //             e.error.location(),
-                //             e.sources,
-                //         ),
-                //     });
-                // Err(PyErr::new::<ApolloGraphQLError, _>(format!("{:?}", rustberry_errors)))
-            }
+            Ok(doc) => Ok(Document { document: doc }),
+            Err(with_errors) => Err(PyValueError::new_err(format_with_errors(&with_errors))),
         }
     }
 
-    fn add_validate(&mut self, document: &str) -> PyResult<bool> {
-        let parsed_result = ExecutableDocument::parse(&self.schema, document, "document.graphql");
+    /// Parse and validate in one shot. Returns a list of
+    /// [`GraphQLError`] – empty on success.
+    fn add_validate(&self, py: Python<'_>, document: &str) -> PyResult<Vec<GraphQLError>> {
+        let parsed = py.detach(|| {
+            ExecutableDocument::parse(&self.schema, document, "document.graphql")
+        });
 
-        if parsed_result.is_err() {
-            return Ok(false);
+        let parsed = match parsed {
+            Ok(doc) => doc,
+            Err(with_errors) => return Ok(diagnostics_to_errors(&with_errors.errors)),
+        };
+
+        let validation = py.detach(|| parsed.validate(&self.schema));
+        match validation {
+            Ok(_) => Ok(Vec::new()),
+            Err(with_errors) => Ok(diagnostics_to_errors(&with_errors.errors)),
         }
-
-        Ok(parsed_result.unwrap().validate(&self.schema).is_ok())
     }
 
-    fn validate(&mut self, document: Document) -> PyResult<bool> {
-        let result = document.document.validate(&self.schema);
-
+    /// Validate an already-parsed [`Document`]. Returns a list of
+    /// [`GraphQLError`] – empty on success.
+    fn validate(&self, py: Python<'_>, document: &Document) -> PyResult<Vec<GraphQLError>> {
+        // `validate` consumes the document; clone the inner document so we
+        // don't move it out of the borrow.
+        let doc = document.document.clone();
+        let result = py.detach(|| doc.validate(&self.schema));
         match result {
-            Ok(valid_doc) => Ok(true),
-            Err(with_errors) => {
-                let errors = with_errors.errors;
-                // let rustberry_errors = errors
-                //     .iter()
-                //     .map(|e| GraphQLError {
-                //         compiler_error: ApolloGraphQLError::new(
-                //             e.error.unstable_compat_message().unwrap_or(e.to_string()),
-                //             e.error.location(),
-                //             e.sources,
-                //         ),
-                //     });
-                Ok(false)
-            }
+            Ok(_) => Ok(Vec::new()),
+            Err(with_errors) => Ok(diagnostics_to_errors(&with_errors.errors)),
         }
     }
-    fn gql_core_ast(&mut self, py: Python<'_>, document: &Document) -> PyResult<PyObject> {
-        // let ast = self.compiler.db.ast(file_id.file_id);
-        let gql_core_ast = self
-            .conversion_context
-            .convert_core_to_core_ast(py, &document.document);
-        Ok(gql_core_ast?)
+
+    /// Convert `document` into a tree of real `graphql-core` AST instances.
+    fn gql_core_ast<'py>(
+        &self,
+        py: Python<'py>,
+        document: &Document,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        self.conversion_context
+            .convert_core_to_core_ast(py, &document.document)
     }
 
-    fn gql_core_ast_mirror(&mut self, py: Python<'_>, document: &Document) -> PyResult<Py<DocumentNode>> {
-        // let ast = self.compiler.db.ast(file_id.file_id);
-        let gql_core_ast = self
+    /// Convert `document` into a lightweight Rust-backed mirror AST.
+    fn gql_core_ast_mirror(
+        &self,
+        py: Python<'_>,
+        document: &Document,
+    ) -> PyResult<Py<DocumentNode>> {
+        let doc_node = self
             .mirror_conversion_context
-            .convert_core_to_core_ast(py, &document.document);
-
-        Py::new(py, gql_core_ast)
+            .convert_core_to_core_ast(py, &document.document)?;
+        Py::new(py, doc_node)
     }
 }
 
-/// A Python module implemented in Rust. The name of this function must match
-/// the `lib.name` setting in the `Cargo.toml`, else Python will not be able to
-/// import the module.
-#[pymodule]
-fn _rustberry(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
-    m.add_class::<QueryCompiler>()?;
+/// Convert apollo-compiler diagnostics into Python-facing
+/// [`GraphQLError`] values.
+fn diagnostics_to_errors(
+    diagnostics: &apollo_compiler::validation::DiagnosticList,
+) -> Vec<GraphQLError> {
+    diagnostics
+        .iter()
+        .map(|diag| GraphQLError {
+            compiler_error: diag.to_json(),
+        })
+        .collect()
+}
 
+#[pymodule]
+fn _rustberry(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<QueryCompiler>()?;
+    m.add_class::<Document>()?;
+    m.add_class::<GraphQLError>()?;
+    m.add_class::<crate::ast::gql_core::location::SourceLocation>()?;
     Ok(())
 }

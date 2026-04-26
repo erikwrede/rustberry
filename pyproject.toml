@@ -1,28 +1,39 @@
-[tool.poetry]
-name = "rustberry"
-version = "0.0.14"
-description = "High-performance Rust-based GraphQL Tooling for Python"
-authors = ["Erik Wrede <erikwrede2@gmail.com>"]
-readme = "README.md"
-license = "MIT"
-packages = [{include = "rustberry"}]
-
-[tool.poetry.dependencies]
-python = "^3.10"
-maturin = "1.1.0"
-
-[tool.maturin]
-module-name = "rustberry._rustberry"
-
-[build-system]
-requires = ["maturin>=1.0,<2.0"]
-build-backend = "maturin"
-
 [project]
 name = "rustberry"
+version = "0.0.15"
+description = "High-performance Rust-based GraphQL Tooling for Python"
+readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.11"
+authors = [
+    { name = "Erik Wrede", email = "erikwrede2@gmail.com" },
+]
 classifiers = [
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
+dependencies = [
+    "graphql-core>=3.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+module-name = "rustberry._rustberry"
+features = ["pyo3/extension-module"]
+python-source = "."
+manifest-path = "Cargo.toml"
+strip = true

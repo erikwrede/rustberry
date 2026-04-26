@@ -1,0 +1,49 @@
+rustberry real-world benchmark
+  rustberry: /Users/erikwrede/dev/oss/graphql/rustberry/rustberry/__init__.py
+  schema dir: /Users/erikwrede/dev/oss/graphql/rustberry/benchmarks/schemas
+
+=== github.graphql (1424.3 KB, 71843 lines) ===
+                                                  simple          medium         complex
+----------------------------------------------------------------------------------------
+graphql-core parse                              30.67 us       155.73 us       793.54 us
+                                          (p95 35.92 us) (p95 186.33 us) (p95 968.29 us)
+graphql-core validate                          193.08 us       626.27 us         2.32 ms
+                                         (p95 410.33 us) (p95 828.96 us)   (p95 2.77 ms)
+graphql-core parse+validate+walk               251.25 us       889.73 us         3.58 ms
+                                         (p95 474.04 us)   (p95 1.12 ms)   (p95 4.51 ms)
+rustberry parse                                  2.67 us        11.21 us        53.06 us
+                                           (p95 3.00 us)  (p95 12.71 us)  (p95 61.00 us)
+rustberry validate                               1.54 us         8.92 us       112.81 us
+                                           (p95 1.62 us)  (p95 10.04 us) (p95 129.54 us)
+rustberry mirror conversion                     333.0 ns         1.21 us         7.00 us
+                                          (p95 334.0 ns)   (p95 1.25 us)   (p95 7.17 us)
+rustberry parse+validate+mirror+walk             6.21 us        29.00 us       202.21 us
+                                           (p95 7.08 us)  (p95 32.67 us) (p95 236.46 us)
+
+  speedup (graphql-core / rustberry) on parse+validate+full pipeline:
+    simple      core=251.25 us  rb=6.21 us  ->   40.5x
+    medium      core=889.73 us  rb=29.00 us  ->   30.7x
+    complex     core=3.58 ms  rb=202.21 us  ->   17.7x
+
+=== spacex.graphql (12.7 KB, 678 lines) ===
+  rustberry parse FAILED on complex: type `LaunchLinks` does not have a field `youtube_id`
+                                                  simple          medium         complex
+----------------------------------------------------------------------------------------
+graphql-core parse                              34.54 us       130.00 us       510.04 us
+                                          (p95 42.29 us) (p95 154.29 us) (p95 662.92 us)
+graphql-core validate                          244.12 us       493.00 us         1.52 ms
+                                         (p95 456.33 us) (p95 707.00 us)   (p95 1.75 ms)
+graphql-core parse+validate+walk               331.56 us       712.25 us         2.34 ms
+                                         (p95 546.38 us) (p95 928.75 us)   (p95 3.35 ms)
+rustberry parse                                  2.79 us         9.46 us               -
+                                           (p95 3.29 us)  (p95 10.62 us)                
+rustberry validate                               1.25 us         5.71 us               -
+                                           (p95 1.38 us)   (p95 6.62 us)                
+rustberry mirror conversion                     333.0 ns         1.04 us               -
+                                          (p95 375.0 ns)   (p95 1.29 us)                
+rustberry parse+validate+mirror+walk             5.92 us        22.54 us               -
+                                           (p95 6.83 us)  (p95 25.29 us)                
+
+  speedup (graphql-core / rustberry) on parse+validate+full pipeline:
+    simple      core=331.56 us  rb=5.92 us  ->   56.0x
+    medium      core=712.25 us  rb=22.54 us  ->   31.6x
